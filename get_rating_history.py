@@ -1,6 +1,7 @@
 from pyvirtualdisplay import Display
 from selenium import webdriver
 from collections import OrderedDict
+import dateparser
 import xmltodict
 import time
 import os
@@ -11,6 +12,95 @@ import logging
 import zipfile
 import glob
 import configparser
+
+
+class CSVExporter:
+    column_names_map = OrderedDict((
+        ('RAN', 'rating_agency_name'),
+        ('FCD', 'file_creating_date'),
+        ('SSC', 'sec_category'),
+        ('ISSNAME', 'issuer_name'),
+        ('LEI', 'legal_entity_identifier'),
+        ('OBT', 'object_type_rated'),
+        ('INSTNAME', 'instrument_name'),
+        ('CUSIP', 'CUSIP_number'),
+        ('CR', 'coupon_date'),
+        ('MD', 'maturity_date'),
+        ('PV', 'par_value'),
+        ('IP', 'issued_paid'),
+        ('R', 'rating'),
+        ('RAD', 'rating_action_date'),
+        ('RAC', 'rating_action_class'),
+        ('RT', 'rating_type'),
+        ('RST', 'rating_sub_type'),
+        ('RTT', 'rating_type_term'),
+        ('OAN', 'other_announcement_type'),
+        ('WST', 'watch_status'),
+        ('ROL', 'rating_outlook'),
+        ('ISI', 'issuer_identifier'),
+        ('ISIS', 'issuer_identifier_schema'),
+        ('INI', 'instrument_identifier'),
+        ('INIS', 'instrument_identifier_schema'),
+        ('CIK', 'central_index_key'),
+        ('OI', 'obligor_identifier'),
+        ('OIS', 'obligor_identifier_schema'),
+        ('OIOS', 'obligor_identifier_other'),
+        ('OSC', 'obligor_sec_category',),
+        ('OIG', 'obligor_industry_group'),
+        ('OBNAME', 'obligor_name'),
+    ))
+
+    files_created = {}
+
+    def __init__(self, csv_path):
+        self.csv_path = csv_path
+
+    @staticmethod
+    def get_value(d, key):
+        if ':' in key:
+            key = key.split(':')[1]
+        return d.get(key, '')
+
+    def export(self, row):
+        try:
+            dt = dateparser.parse(row['FCD'])
+        except KeyError:
+            try:
+                dt = dateparser.parse(row['r:FCD'])
+            except KeyError:
+                dt = dateparser.parse(row['rt:FCD'])
+        try:
+            asset_class = row['SSC'].strip()
+        except KeyError:
+            try:
+                asset_class = row['r:SSC'].strip()
+            except KeyError:
+                asset_class = row['rt:SSC'].strip()
+        try:
+            agency = row['RAN'].strip()
+        except KeyError:
+            try:
+                agency = row['r:RAN'].strip()
+            except KeyError:
+                agency = row['rt:RAN'].strip()
+        file_name = '{}_{}_{}.csv'.format(
+            dt.strftime('%Y%m%d'),
+            agency, asset_class
+        )
+        if file_name in self.files_created:
+            csv_file = self.files_created[file_name]['file']
+            writer = self.files_created[file_name]['writer']
+        else:
+            self.files_created[file_name] = {}
+            csv_file = self.files_created[file_name]['file'] = open(os.path.join(self.csv_path, file_name), 'w')
+            writer = self.files_created[file_name]['writer'] = csv.writer(csv_file)
+            writer.writerow([v for v in self.column_names_map.values()])
+        writer.writerow([self.get_value(row, key) for key in self.column_names_map])
+        csv_file.flush()
+
+    def close(self):
+        for v in self.files_created.values():
+            v['file'].close()
 
 
 def is_download_completed(downloads_path):
@@ -103,15 +193,6 @@ def download_fitchratings(browser, config):
             return path
 
 
-def get_keys(lst):
-    keys = []
-    for row in lst:
-        for key in row:
-            if key not in keys:
-                keys.append(key)
-    return keys
-
-
 def dict_to_list(d, row_template, rows):
     for key in d:
         if isinstance(d[key], OrderedDict):
@@ -145,6 +226,7 @@ def parse_xml(file_path):
 
 
 def process_zip_file(file_path, source):
+    exporter = CSVExporter(csv_path)
     logging.debug('{} zip file downloaded to {}'.format(source, file_path))
     zip_file = zipfile.ZipFile(file_path)
     list_content = []
@@ -152,24 +234,16 @@ def process_zip_file(file_path, source):
         if file_name.endswith('.xml'):
             try:
                 extracted_path = zip_file.extract(file_name, xml_path)
-            except:
+            except zipfile.BadZipFile:
                 logging.debug('{} extraction failed - archive corrupted!')
                 continue
             logging.debug('{} extracted'.format(extracted_path))
-            list_content += parse_xml(extracted_path)
+            list_content = parse_xml(extracted_path)
+            for row in list_content:
+                exporter.export(row)
             logging.debug('{} parsed'.format(extracted_path))
-    header = get_keys(list_content)
-    csv_file_name = os.path.join(csv_path, ntpath.basename(file_name).replace('.xml', '.csv'))
-    with open(csv_file_name, 'w') as f:
-        writer = csv.writer(f)
-        writer.writerow(header)
-        for row in list_content:
-            csv_row = []
-            for key in header:
-                csv_row.append(row.get(key, ''))
-            writer.writerow(csv_row)
-            f.flush()
-    logging.debug('{} saved'.format(csv_file_name))
+    exporter.close()
+    logging.debug('{} processed'.format(file_path))
 
 
 if __name__ == '__main__':
