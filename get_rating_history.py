@@ -128,7 +128,7 @@ def dict_to_list(d, row_template, rows):
 
 
 def parse_xml(file_path):
-    with open(file_path, 'r') as f:
+    with open(file_path, 'rb') as f:
         dict_data = xmltodict.parse(f.read())
     list_data_raw = []
     try:
@@ -150,7 +150,11 @@ def process_zip_file(file_path, source):
     list_content = []
     for file_name in zip_file.namelist():
         if file_name.endswith('.xml'):
-            extracted_path = zip_file.extract(file_name, xml_path)
+            try:
+                extracted_path = zip_file.extract(file_name, xml_path)
+            except:
+                logging.debug('{} extraction failed - archive corrupted!')
+                continue
             logging.debug('{} extracted'.format(extracted_path))
             list_content += parse_xml(extracted_path)
             logging.debug('{} parsed'.format(extracted_path))
@@ -193,11 +197,11 @@ if __name__ == '__main__':
     elif not os.path.isdir(xml_path):
         print('ERROR: xml_path parameter points to file!')
         sys.exit(1)
-    csv_path = config.get('general', 'xml_path', fallback='/tmp/csv_path/')
+    csv_path = config.get('general', 'csv_path', fallback='/tmp/csv_path/')
     if not os.path.exists(csv_path):
         os.mkdir(csv_path)
     elif not os.path.isdir(csv_path):
-        print('ERROR: xml_path parameter points to file!')
+        print('ERROR: csv_path parameter points to file!')
         sys.exit(1)
 
     logging.debug('Started')
