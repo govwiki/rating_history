@@ -9,6 +9,7 @@ import csv
 import sys
 import ntpath
 import logging
+import shutil
 import zipfile
 import glob
 import configparser
@@ -51,6 +52,7 @@ class CSVExporter:
     ))
 
     files_created = {}
+    namespaces = ['r', 'rt']
 
     def __init__(self, csv_path):
         self.csv_path = csv_path
@@ -61,28 +63,22 @@ class CSVExporter:
             key = key.split(':')[1]
         return d.get(key, '')
 
+    def get_value_without_namespace(self, d, keys):
+        for key in keys:
+            try:
+                return d[key]
+            except KeyError:
+                for ns in self.namespaces:
+                    try:
+                        return d['{}:{}'.format(ns, key)]
+                    except KeyError:
+                        continue
+        return 'N/A'
+
     def export(self, row):
-        try:
-            dt = dateparser.parse(row['FCD'])
-        except KeyError:
-            try:
-                dt = dateparser.parse(row['r:FCD'])
-            except KeyError:
-                dt = dateparser.parse(row['rt:FCD'])
-        try:
-            asset_class = row['SSC'].strip()
-        except KeyError:
-            try:
-                asset_class = row['r:SSC'].strip()
-            except KeyError:
-                asset_class = row['rt:SSC'].strip()
-        try:
-            agency = row['RAN'].strip()
-        except KeyError:
-            try:
-                agency = row['r:RAN'].strip()
-            except KeyError:
-                agency = row['rt:RAN'].strip()
+        dt = dateparser.parse(self.get_value_without_namespace(row, ['FCD']))
+        asset_class = self.get_value_without_namespace(row, ['SSC', 'OSC'])
+        agency = self.get_value_without_namespace(row, ['RAN'])
         file_name = '{}_{}_{}.csv'.format(
             dt.strftime('%Y%m%d'),
             agency, asset_class
@@ -277,6 +273,14 @@ if __name__ == '__main__':
     elif not os.path.isdir(csv_path):
         print('ERROR: csv_path parameter points to file!')
         sys.exit(1)
+    if config.getboolean('general', 'wipe_old_files', fallback=False):
+        for dir in (downloads_path, xml_path, csv_path):
+            for f in os.listdir(dir):
+                path = os.path.join(dir, f)
+                if os.path.isfile(path):
+                    os.unlink(path)
+                else:
+                    shutil.rmtree(path)
 
     logging.debug('Started')
     options = webdriver.ChromeOptions()
