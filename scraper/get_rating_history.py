@@ -88,10 +88,10 @@ class CSVExporter:
             writer = self.files_created[file_name]['writer']
         else:
             self.files_created[file_name] = {}
-            csv_file = self.files_created[file_name]['file'] = open(os.path.join(self.csv_path, file_name), 'w')
+            csv_file = self.files_created[file_name]['file'] = open(os.path.join(self.csv_path, file_name), 'w', encoding='utf8')
             writer = self.files_created[file_name]['writer'] = csv.writer(csv_file)
             writer.writerow([v for v in self.column_names_map.values()])
-        writer.writerow([self.get_value(row, key).encode('utf8') for key in self.column_names_map])
+        writer.writerow([self.get_value(row, key) for key in self.column_names_map])
         csv_file.flush()
 
     def close(self):
