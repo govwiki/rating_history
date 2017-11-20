@@ -1,0 +1,15 @@
+version: "3.3"
+services:
+  scraper:
+    build: ./scraper
+    volumes:
+      - csv_path:/var/csv_path/
+  web-app:
+    build: ./web-app
+    volumes:
+      - csv_path:/var/csv_path/
+    ports:
+      - "80:8080"
+
+volumes:
+     csv_path:

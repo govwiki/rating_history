@@ -91,7 +91,7 @@ class CSVExporter:
             csv_file = self.files_created[file_name]['file'] = open(os.path.join(self.csv_path, file_name), 'w')
             writer = self.files_created[file_name]['writer'] = csv.writer(csv_file)
             writer.writerow([v for v in self.column_names_map.values()])
-        writer.writerow([self.get_value(row, key) for key in self.column_names_map])
+        writer.writerow([self.get_value(row, key).encode('utf8') for key in self.column_names_map])
         csv_file.flush()
 
     def close(self):
@@ -284,10 +284,10 @@ if __name__ == '__main__':
 
     logging.debug('Started')
     options = webdriver.ChromeOptions()
-    options.add_argument("--start-maximized")
+    options.add_argument("--no-sandbox") 
     prefs = {"download.default_directory": downloads_path}
     options.add_experimental_option("prefs", prefs)
-    browser = webdriver.Chrome(chrome_options=options)
+    browser = webdriver.Chrome(chrome_options=options, service_args=["--verbose", "--log-path=/tmp/selenium.log"])
     browser.implicitly_wait(10)
     logging.debug('Browser started')
 
