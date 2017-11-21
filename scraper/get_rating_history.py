@@ -79,7 +79,7 @@ class CSVExporter:
         dt = dateparser.parse(self.get_value_without_namespace(row, ['FCD']))
         asset_class = self.get_value_without_namespace(row, ['SSC', 'OSC'])
         agency = self.get_value_without_namespace(row, ['RAN'])
-        file_name = '{}_{}_{}.csv'.format(
+        file_name = '{} {} {}.csv'.format(
             dt.strftime('%Y%m%d'),
             agency, asset_class
         )
