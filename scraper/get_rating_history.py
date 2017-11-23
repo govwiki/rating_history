@@ -59,9 +59,14 @@ class CSVExporter:
 
     @staticmethod
     def get_value(d, key):
-        if ':' in key:
-            key = key.split(':')[1]
-        return d.get(key, '')
+        for k in d:
+            if ':' in k:
+                key_found = k.split(':')[1] == key
+            else:
+                key_found = k == key
+            if key_found:
+                return d[k]
+        return ''
 
     def get_value_without_namespace(self, d, keys):
         for key in keys:
@@ -284,16 +289,16 @@ if __name__ == '__main__':
 
     logging.debug('Started')
     options = webdriver.ChromeOptions()
-    options.add_argument("--no-sandbox") 
+    options.add_argument("--no-sandbox")
     prefs = {"download.default_directory": downloads_path}
     options.add_experimental_option("prefs", prefs)
     browser = webdriver.Chrome(chrome_options=options, service_args=["--verbose", "--log-path=/tmp/selenium.log"])
     browser.implicitly_wait(10)
     logging.debug('Browser started')
 
-    moodies_zip_path = download_moodies(browser, config)
-    if moodies_zip_path:
-        process_zip_file(moodies_zip_path, 'Moodies')
+    #moodies_zip_path = download_moodies(browser, config)
+    #if moodies_zip_path:
+    #    process_zip_file(moodies_zip_path, 'Moodies')
 
     for zip_path in download_standard_and_poors(browser, config):
         process_zip_file(zip_path, 'Standardandpoors')
