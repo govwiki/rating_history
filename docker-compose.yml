@@ -1,10 +1,12 @@
 version: "3.3"
 services:
   scraper:
+    container_name: ratings_scraper
     build: ./scraper
     volumes:
       - csv_path:/var/csv_path/
   web-app:
+    container_name: ratings_web_app
     build: ./web-app
     volumes:
       - csv_path:/var/csv_path/
