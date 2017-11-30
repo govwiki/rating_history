@@ -12,6 +12,12 @@ services:
       - csv_path:/var/csv_path/
     ports:
       - "80:8080"
+  uploader:
+    container_name: dataworld_uploader
+    build: ./data.world_upload/
+    volumes:
+      - csv_path:/var/csv_path/
+
 
 volumes:
      csv_path:
