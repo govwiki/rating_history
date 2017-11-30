@@ -104,94 +104,118 @@ class CSVExporter:
             v['file'].close()
 
 
-def is_download_completed(downloads_path):
-    time.sleep(10)
-    while True:
-        current_downloads = glob.glob(downloads_path + '*.crdownload')
-        if len(current_downloads) == 0:
-            # print'Downloading ' + audit + ' completed')
-            break
-        else:
+class NotLoggedInException(Exception):
+    pass
+
+
+class Downloader:
+    selectors = {
+        'moodies': {
+            'login': '#mdcLoginControl #MdcUserName',
+            'password': '#mdcLoginControl #MdcPassword',
+            'submit': '#mdcLoginControl #LoginImageButton',
+            'download': '.PageContent a:last-child',
+        },
+        'standardandpoors': {
+            'login': '#_oamloginportlet_WAR_rdsmregistrationportlet_email',
+            'password': '#_oamloginportlet_WAR_rdsmregistrationportlet_password',
+            'submit': '#submitForm',
+            'download': 'div.ratings-history-files a',
+        },
+        'fitchratings': {
+            'login': '#loginForm:userName',
+            'password': '#loginForm:password',
+            'submit': '#loginForm:submit',
+            'download': '#license:accept',
+        },
+        'krollbond': {
+            'login': 'input[name="email"]',
+            'password': 'input[name="password"]',
+            'submit': 'button[type="submit"]',
+            'download': '#SEC_regulartory_docs_list>ul:last-child a',
+        },
+        'dbrs': {
+            'login': '#fields_user_name',
+            'password': '#fields_password',
+            'submit': '#ok',
+            'download': '.agree',
+        },
+        'morningstar': {
+            'download': '.nano-content>div>div>ul a',
+        },
+        'eganjones': {
+            'download': '#rule_17g-7 a',
+        },
+        'hrratings': {
+            'download': 'div.col.wMini>div>p>a',
+        },
+        'ambest': {
+            'login': '#EMAIL',
+            'password': '#CurPwd',
+            'submit': '#btnContinue',
+            'download': 'table.styledTable a',
+        },
+        'jcr': {
+            'download': 'td.zip a',
+        },
+    }
+
+    def __init__(self, config):
+        self.downloads_path = config.get('general', 'downloads_path', fallback='/tmp/downloads/')
+        self.config = config
+        options = webdriver.ChromeOptions()
+        options.add_argument("--no-sandbox")
+        prefs = {"download.default_directory": self.downloads_path}
+        options.add_experimental_option("prefs", prefs)
+        self.browser = webdriver.Chrome(chrome_options=options, service_args=["--verbose", "--log-path=/tmp/selenium.log"])
+        self.browser.implicitly_wait(10)
+        logging.debug('Browser started')
+
+    def is_download_completed(self):
+        while True:
             time.sleep(10)
+            current_downloads = glob.glob(self.downloads_path + '*.crdownload')
+            if len(current_downloads) == 0:
+                break
 
+    def login(self, agency):
+        try:
+            login = self.config[agency]['login']
+            password = self.config[agency]['password']
+        except KeyError as e:
+            logging.debug('{} not provided for {}, skipping...'.format(e.args[0], agency))
+            raise NotLoggedInException
+        self.browser.find_element_by_css_selector(self.selectors[agency]['login']).send_keys(login)
+        self.browser.find_element_by_css_selector(self.selectors[agency]['password']).send_keys(password)
+        self.browser.find_element_by_css_selector(self.selectors[agency]['submit']).click()
 
-def download_moodies(browser, config):
-    downloads_path = config.get('general', 'downloads_path', fallback='/tmp/downloads/')
-    try:
-        url = config['moodies']['url']
-        login = config['moodies']['login']
-        password = config['moodies']['password']
-    except KeyError as e:
-        if e.args[0] == 'moodies':
-            logging.debug('moodies section not provided in config file, skipping...')
-        else:
-            logging.debug('{} not provided for moodies, skipping...'.format(e.args[0]))
-        return
-    downloads_before = glob.glob(downloads_path + '*.zip')
-    browser.get(url)
-    browser.find_element_by_css_selector('#mdcLoginControl #MdcUserName').send_keys(login)
-    browser.find_element_by_css_selector('#mdcLoginControl #MdcPassword').send_keys(password)
-    browser.find_element_by_css_selector('#mdcLoginControl #LoginImageButton').click()
-    browser.find_element_by_link_text('Click here').click()
-    is_download_completed(downloads_path)
-    downloads_after = glob.glob(downloads_path + '*.zip')
-    for path in downloads_after:
-        if path not in downloads_before:
-            return path
-
-
-def download_standard_and_poors(browser, config):
-    downloads_path = config.get('general', 'downloads_path', fallback='/tmp/downloads/')
-    try:
-        url = config['standardandpoors']['url']
-        login = config['standardandpoors']['login']
-        password = config['standardandpoors']['password']
-    except KeyError as e:
-        if e.args[0] == 'standardandpoors ':
-            logging.debug('standardandpoors section not provided in config file, skipping...')
-        else:
-            logging.debug('{} not provided for standardandpoors, skipping...'.format(e.args[0]))
-        return []
-    downloads_before = glob.glob(downloads_path + '*.zip')
-    browser.get(url)
-    browser.find_element_by_id('_oamloginportlet_WAR_rdsmregistrationportlet_email').send_keys(login)
-    browser.find_element_by_id('_oamloginportlet_WAR_rdsmregistrationportlet_password').send_keys(password)
-    browser.find_element_by_id('submitForm').click()
-    time.sleep(10)
-    for link in browser.find_elements_by_css_selector('div.ratings-history-files a'):
-        link.click()
-        is_download_completed(downloads_path)
-    downloads_after = glob.glob(downloads_path + '*.zip')
-    for path in downloads_after:
-        if path not in downloads_before:
-            yield path
-
-
-def download_fitchratings(browser, config):
-    downloads_path = config.get('general', 'downloads_path', fallback='/tmp/downloads/')
-    try:
-        url = config['fitchratings']['url']
-        login = config['fitchratings']['login']
-        password = config['fitchratings']['password']
-    except KeyError as e:
-        if e.args[0] == 'fitchratings':
-            logging.debug('fitchratings section not provided in config file, skipping...')
-        else:
-            logging.debug('{} not provided for moodies, skipping...'.format(e.args[0]))
-        return
-    downloads_before = glob.glob(downloads_path + '*.zip')
-    browser.get(url)
-    browser.find_element_by_link_text('17g-7 Ratings History Disclosure').click()
-    browser.switch_to.window(browser.window_handles[1])
-    browser.find_element_by_id('loginForm:userName').send_keys(login)
-    browser.find_element_by_id('loginForm:password').send_keys(password)
-    browser.find_element_by_id('loginForm:submit').click()
-    browser.find_element_by_id('license:accept').click()
-    is_download_completed(downloads_path)
-    downloads_after = glob.glob(downloads_path + '*.zip')
-    for path in downloads_after:
-        if path not in downloads_before:
-            return path
+    def download(self, agency):
+        try:
+            path = self.config[agency]['path']
+        except KeyError as e:
+            if e.args[0] == agency:
+                logging.debug('{} section not provided in config file, skipping...'.format(agency))
+            else:
+                logging.debug('{} not provided for {}, skipping...'.format(e.args[0], agency))
+        downloads_before = glob.glob(self.downloads_path + '*.zip')
+        for step in path.split('\n'):
+            if step == 'login':
+                try:
+                    self.login(agency)
+                except NotLoggedInException:
+                    return
+            elif step == 'scroll_down':
+                self.browser.execute_script('window.scrollTo(0, document.body.scrollHeight)')
+            else:
+                self.browser.get(step)
+            time.sleep(3)
+        for link in self.browser.find_elements_by_css_selector(self.selectors[agency]['download']):
+            link.click()
+            self.is_download_completed()
+        downloads_after = glob.glob(self.downloads_path + '*.zip')
+        for path in downloads_after:
+            if path not in downloads_before:
+                yield path
 
 
 def dict_to_list(d, row_template, rows):
@@ -247,6 +271,15 @@ def process_zip_file(file_path, source):
     logging.debug('{} processed'.format(file_path))
 
 
+def clear_dir(dir):
+    for f in os.listdir(dir):
+        path = os.path.join(dir, f)
+        if os.path.isfile(path):
+            os.unlink(path)
+        else:
+            shutil.rmtree(path)
+
+
 if __name__ == '__main__':
     config = configparser.ConfigParser()
     config.read('conf.ini')
@@ -278,33 +311,21 @@ if __name__ == '__main__':
     elif not os.path.isdir(csv_path):
         print('ERROR: csv_path parameter points to file!')
         sys.exit(1)
-    if config.getboolean('general', 'wipe_old_files', fallback=False):
-        for dir in (downloads_path, xml_path, csv_path):
-            for f in os.listdir(dir):
-                path = os.path.join(dir, f)
-                if os.path.isfile(path):
-                    os.unlink(path)
-                else:
-                    shutil.rmtree(path)
+    wipe_old_files = config.getboolean('general', 'wipe_old_files', fallback=False)
+    if wipe_old_files:
+        for dir in (downloads_path, xml_path):
+            clear_dir(dir)
 
     logging.debug('Started')
-    options = webdriver.ChromeOptions()
-    options.add_argument("--no-sandbox")
-    prefs = {"download.default_directory": downloads_path}
-    options.add_experimental_option("prefs", prefs)
-    browser = webdriver.Chrome(chrome_options=options, service_args=["--verbose", "--log-path=/tmp/selenium.log"])
-    browser.implicitly_wait(10)
-    logging.debug('Browser started')
+    downloader = Downloader(config)
 
-    #moodies_zip_path = download_moodies(browser, config)
-    #if moodies_zip_path:
-    #    process_zip_file(moodies_zip_path, 'Moodies')
-
-    for zip_path in download_standard_and_poors(browser, config):
-        process_zip_file(zip_path, 'Standardandpoors')
-
-    fitchratings_zip_path = download_fitchratings(browser, config)
-    if fitchratings_zip_path:
-        process_zip_file(fitchratings_zip_path, 'Fitchratings')
+    for agency in ['moodies', 'standardandpoors', 'krollbond', 'dbrs', 'morningstar', 'eganjones', 'hrratings', 'ambest', 'jcr']:
+        paths = downloader.download(agency)
+        if paths:
+            if wipe_old_files:
+                pass
+            for path in paths:
+                print(path)
+                process_zip_file(path, agency.capitalize)
     logging.debug('Rating history conversion finished!')
-    browser.quit()
+    downloader.browser.quit()
