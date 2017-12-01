@@ -135,10 +135,12 @@ class Downloader:
             'download': '#SEC_regulartory_docs_list>ul:last-child a',
         },
         'dbrs': {
-            'login': '#fields_user_name',
-            'password': '#fields_password',
-            'submit': '#ok',
-            'download': '.agree',
+            'form': 'li.login-btn',
+            'accept': 'input:last-child',
+            'login': '#usernameField',
+            'password': '#passwordField',
+            'submit': 'a[ng-click="$ctrl.submit()"]',
+            'download': 'button[ng-click="$ctrl.getXBRL()"]',
         },
         'morningstar': {
             'download': '.nano-content>div>div>ul a',
@@ -206,6 +208,10 @@ class Downloader:
                     return
             elif step == 'scroll_down':
                 self.browser.execute_script('window.scrollTo(0, document.body.scrollHeight)')
+            elif step == 'click_form':
+                self.browser.find_element_by_css_selector(self.selectors[agency]['form']).click()
+            elif step == 'click_accept':
+                self.browser.find_element_by_css_selector(self.selectors[agency]['accept']).click()
             else:
                 self.browser.get(step)
             time.sleep(3)
@@ -237,21 +243,32 @@ def parse_xml(file_path):
     with open(file_path, 'rb') as f:
         dict_data = xmltodict.parse(f.read())
     list_data_raw = []
+    print(file_path)
     try:
         target_data = dict_data['xbrli:xbrl']['ROCRA']
     except KeyError:
         try:
             target_data = dict_data['xbrli:xbrl']['r:ROCRA']
         except KeyError:
-            target_data = dict_data['xbrli:xbrl']['rt:ROCRA']
+            try:
+                target_data = dict_data['xbrli:xbrl']['rt:ROCRA']
+            except KeyError:
+                target_data = dict_data['xbrli:xbrl']['ISD']
     dict_to_list(target_data, OrderedDict(), list_data_raw)
     max_len = max([len(r) for r in list_data_raw])
     list_data = [r for r in list_data_raw if len(r) == max_len]
+    if 'FCD' not in list_data[0] and 'r:FCD' not in list_data[0] and 'rt:FCD' not in list_data[0]:
+        fcd = dict_data['xbrli:xbrl']['FCD']['#text']
+        for row in list_data:
+            row['FCD'] = fcd
+    if 'RAN' not in list_data[0] and 'r:RAN' not in list_data[0] and 'rt:RAN' not in list_data[0]:
+        ran = dict_data['xbrli:xbrl']['RAN']['#text']
+        for row in list_data:
+            row['RAN'] = ran
     return list_data
 
 
-def process_zip_file(file_path, source):
-    exporter = CSVExporter(csv_path)
+def process_zip_file(file_path, source, exporter):
     logging.debug('{} zip file downloaded to {}'.format(source, file_path))
     zip_file = zipfile.ZipFile(file_path)
     list_content = []
@@ -267,7 +284,6 @@ def process_zip_file(file_path, source):
             for row in list_content:
                 exporter.export(row)
             logging.debug('{} parsed'.format(extracted_path))
-    exporter.close()
     logging.debug('{} processed'.format(file_path))
 
 
@@ -319,6 +335,7 @@ if __name__ == '__main__':
     logging.debug('Started')
     downloader = Downloader(config)
 
+    exporter = CSVExporter(csv_path)
     for agency in ['moodies', 'standardandpoors', 'krollbond', 'dbrs', 'morningstar', 'eganjones', 'hrratings', 'ambest', 'jcr']:
         paths = downloader.download(agency)
         if paths:
@@ -326,6 +343,7 @@ if __name__ == '__main__':
                 pass
             for path in paths:
                 print(path)
-                process_zip_file(path, agency.capitalize)
+                process_zip_file(path, agency.capitalize, exporter)
     logging.debug('Rating history conversion finished!')
     downloader.browser.quit()
+    exporter.close()
