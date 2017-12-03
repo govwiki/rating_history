@@ -7,7 +7,7 @@ import time
 import os
 import csv
 import sys
-import ntpath
+import sqlite3
 import logging
 import shutil
 import zipfile
@@ -56,6 +56,33 @@ class CSVExporter:
 
     def __init__(self, csv_path):
         self.csv_path = csv_path
+        self.db = sqlite3.connect('/var/db/ratings.sqlite3')
+
+    def get_agency_id(self, name):
+        c = self.db.cursor()
+        c.execute('SELECT id FROM ratings_agency WHERE name=?', (name,))
+        row = c.fetchone()
+        if row:
+            return row[0]
+        c.execute('INSERT INTO ratings_agency (name, position) VALUES (?, 1)', (name,))
+        self.db.commit()
+        return c.lastrowid
+
+    def save_file_record(self, path, agency_name):
+        c = self.db.cursor()
+        c.execute('SELECT id FROM ratings_file WHERE path=?', (path,))
+        row = c.fetchone()
+        with open(path, 'r') as f:
+            lines_count = sum(1 for line in f)
+        if row:
+            c.execute('UPDATE ratings_file SET lines_count=? WHERE id=?', (lines_count, row[0]))
+        else:
+            agency_id = self.get_agency_id(agency_name)
+            c.execute(
+                'INSERT INTO ratings_file(path, agency_id, lines_count) VALUES (?, ?, ?)',
+                (path, agency_id, lines_count)
+            )
+        self.db.commit()
 
     @staticmethod
     def get_value(d, key):
@@ -78,7 +105,7 @@ class CSVExporter:
                         return d['{}:{}'.format(ns, key)]
                     except KeyError:
                         continue
-        return 'N/A'
+        return 'NA'
 
     def export(self, row):
         dt = dateparser.parse(self.get_value_without_namespace(row, ['FCD']))
@@ -95,6 +122,7 @@ class CSVExporter:
             self.files_created[file_name] = {}
             csv_file = self.files_created[file_name]['file'] = open(os.path.join(self.csv_path, file_name), 'w', encoding='utf8')
             writer = self.files_created[file_name]['writer'] = csv.writer(csv_file)
+            self.files_created[file_name]['agency'] = agency
             writer.writerow([v for v in self.column_names_map.values()])
         writer.writerow([self.get_value(row, key) for key in self.column_names_map])
         csv_file.flush()
@@ -102,6 +130,9 @@ class CSVExporter:
     def close(self):
         for v in self.files_created.values():
             v['file'].close()
+            self.save_file_record(
+                os.path.realpath(v['file'].name), v['agency']
+            )
 
 
 class NotLoggedInException(Exception):

@@ -5,11 +5,13 @@ services:
     build: ./scraper
     volumes:
       - csv_path:/var/csv_path/
+      - db_path:/var/db/
   web-app:
     container_name: ratings_web_app
-    build: ./web-app
+    build: ./ratings_web_app
     volumes:
       - csv_path:/var/csv_path/
+      - db_path:/var/db/
     ports:
       - "80:8080"
   uploader:
@@ -21,3 +23,4 @@ services:
 
 volumes:
      csv_path:
+     db_path:

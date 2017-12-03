@@ -10,5 +10,9 @@ COPY get_rating_history.py /rating_history/get_rating_history.py
 COPY conf.ini /rating_history/conf.ini
 
 WORKDIR /rating_history/
-ENV LC_ALL=en_US.UTF-8
+RUN apt install -y locales && rm -rf /var/lib/apt/lists/* \
+    && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
+ENV LANG en_US.UTF-8
+ENV LANGUAGE en_US:en
+ENV LC_ALL en_US.UTF-8
 CMD python3 get_rating_history.py

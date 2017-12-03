@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Rating history</title>
+    <style>
+      div {
+        width: 800px;
+        margin: 30px;
+      }
+
+      h2 {
+        font: 400 40px/1.5 Helvetica, Verdana, sans-serif;
+        margin: 0;
+        padding: 0;
+      }
+
+      h3 {
+        font: 200 20px/1.5 Helvetica, Verdana, sans-serif;
+        margin: 0;
+        padding: 0;
+      }
+
+      ul {
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      li {
+        font: 200 20px/1.5 Helvetica, Verdana, sans-serif;
+        border-bottom: 1px solid #ccc;
+      }
+
+      li:last-child {
+        border: none;
+      }
+
+      li a {
+        text-decoration: none;
+        color: #000;
+
+        -webkit-transition: font-size 0.3s ease, background-color 0.3s ease;
+        -moz-transition: font-size 0.3s ease, background-color 0.3s ease;
+        -o-transition: font-size 0.3s ease, background-color 0.3s ease;
+        -ms-transition: font-size 0.3s ease, background-color 0.3s ease;
+        transition: font-size 0.3s ease, background-color 0.3s ease;
+        display: block;
+        width: 800px;
+      }
+      .text-danger {
+        color: #dc3545 !important;
+      }
+    </style>
+    <link href="main.css" rel="stylesheet">
+  </head>
+  <body>
+    <div class="text-danger">{{ error_msg }}</div>
+    <div>
+      <h2>Credit Rating Agency Ratings History Data</h2><hr>
+      <h3>
+    Under SEC Regulation 17g-7, Nationally Recognized Statistical Rating Organizations (NRSRSOs) are required to report their historical rating assignments, upgrades, downgrades and withdrawals since 2010. The files must be updated monthly, formatted in XBRL and posted to each rating agency's website. Rating data are generally reported on a one year delay.<p>
+    Because most researchers are unfamiliar with XBRL and cannot easily locate the history files, this valuable resource has seen limited use. On this web page, we provide histories from multiple agencies converted to CSV format - which may be directly loaded into Microsoft Excel or Access.<p>
+    The files linked below are named to denote the date provided, rating agency name and asset category.<p>
+      <hr>
+      </h3>
+      <ul>
+        {% for file in files %}
+          <li>
+            <a href="/csv/{{ file }}">{{ file }}  <span>({{ file.lines_count }} lines)</span></a>
+          </li>
+        {% endfor %}
+      </ul>
+    <p>
+    <hr>
+    <h3>
+    Abbreviations in these files are explained in Section 2.4 of the <a href="https://www.sec.gov/structureddata/rocr-publication-guide.html" target="_blank">SEC's Rating History Publication Guide.</a><p>
+    Download and parsing script available on <a href="https://github.com/govwiki/rating_history" target="_blank">Github.</a><p>
+    <hr>
+    This resource was created by the <a href="http://www.municipalfinance.org" target="_blank">Center for Municipal Finance</a> with the generous support from the <a href="https://www.sandiego.edu/law/centers/ccsl/" target="_blank">Center for Corporate and Securities Law at the University of San Diego School of Law.</a><p>
+    </h3>
+    <hr>
+    </div>
+  </body>
+</html>
