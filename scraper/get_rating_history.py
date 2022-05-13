@@ -1,5 +1,8 @@
 from pyvirtualdisplay import Display
 from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from collections import OrderedDict
 import dateparser
 import xmltodict
@@ -13,6 +16,9 @@ import shutil
 import zipfile
 import glob
 import configparser
+
+from webdriver_manager.firefox import GeckoDriverManager
+
 
 
 class CSVExporter:
@@ -56,7 +62,7 @@ class CSVExporter:
 
     def __init__(self, csv_path):
         self.csv_path = csv_path
-        self.db = sqlite3.connect('/var/db/ratings.sqlite3')
+        self.db = sqlite3.connect('../var/db/ratings.sqlite3')
 
     def get_agency_id(self, name):
         c = self.db.cursor()
@@ -142,10 +148,11 @@ class NotLoggedInException(Exception):
 class Downloader:
     selectors = {
         'moodies': {
-            'login': '#mdcLoginControl #MdcUserName',
-            'password': '#mdcLoginControl #MdcPassword',
-            'submit': '#mdcLoginControl #LoginImageButton',
+            'login': 'div.login-name:nth-child(1) > div:nth-child(2) > input:nth-child(1)',
+            'password': 'div.login-name:nth-child(2) > div:nth-child(2) > input:nth-child(1)',
+            'submit': '.kIEpAt',
             'download': '.PageContent a:last-child',
+            'accept': '#onetrust-accept-btn-handler',
         },
         'standardandpoors': {
             'login': '#_oamloginportlet_WAR_rdsmregistrationportlet_email',
@@ -154,24 +161,27 @@ class Downloader:
             'download': 'div.ratings-history-files a',
         },
         'fitchratings': {
-            'login': '#loginForm:userName',
-            'password': '#loginForm:password',
-            'submit': '#loginForm:submit',
-            'download': '#license:accept',
+            'login': False,
+            'password': False,
+            'submit': False,
+            'download': False,
+            'accept': '#btn-1',
         },
-        'krollbond': {
-            'login': 'input[name="email"]',
-            'password': 'input[name="password"]',
-            'submit': 'button[type="submit"]',
-            'download': '#SEC_regulartory_docs_list>ul:last-child a',
+        'kbra': {
+            'login': '#username',
+            'password': '#password',
+            'submit': '#login-button-label',
+            'download': 'button.kbra-btn:nth-child(1)',
+            'accept': False,
         },
         'dbrs': {
-            'form': 'li.login-btn',
-            'accept': 'input:last-child',
+            'accept': '.button--fullWidth',
+            'sign_in': '.button--secondary',
             'login': '#usernameField',
             'password': '#passwordField',
-            'submit': 'a[ng-click="$ctrl.submit()"]',
-            'download': 'button[ng-click="$ctrl.getXBRL()"]',
+            'submit': '#btn-login',
+            'accept_download': '#acceptance-check-box',
+            'download': 'button.button',
         },
         'morningstar': {
             'download': '.nano-content>div>div>ul a',
@@ -194,13 +204,27 @@ class Downloader:
     }
 
     def __init__(self, config):
-        self.downloads_path = config.get('general', 'downloads_path', fallback='/tmp/downloads/')
+
+        direct = os.path.dirname(os.path.abspath(__file__)).split('/')
+        direct = '/'.join(direct[:-1])
+        print(direct)
+        self.downloads_path = direct + config.get('general', 'downloads_path', fallback='/tmp/downloads/')
+        print(f"{self.downloads_path=}")
         self.config = config
-        options = webdriver.ChromeOptions()
-        options.add_argument("--no-sandbox")
-        prefs = {"download.default_directory": self.downloads_path}
-        options.add_experimental_option("prefs", prefs)
-        self.browser = webdriver.Chrome(chrome_options=options, service_args=["--verbose", "--log-path=/tmp/selenium.log"])
+
+        options = webdriver.FirefoxOptions()
+        options.add_argument("user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:65.0) Gecko/20100101 Firefox/65.0")
+        #options.headless = True
+        profile = webdriver.FirefoxProfile()
+        profile.set_preference("browser.download.folderList", 2)
+        profile.set_preference("browser.download.manager.showWhenStarting", False)
+        profile.set_preference("browser.download.manager.useWindow", True)
+        profile.set_preference("browser.download.dir", self.downloads_path)
+        profile.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/pdf,application/msword,text/csv")
+        profile.set_preference("pdfjs.disabled", True)
+
+        self.browser = webdriver.Firefox(executable_path=GeckoDriverManager().install(), options=options, firefox_profile=profile)
+
         self.browser.implicitly_wait(10)
         logging.debug('Browser started')
 
@@ -208,6 +232,7 @@ class Downloader:
         while True:
             time.sleep(10)
             current_downloads = glob.glob(self.downloads_path + '*.crdownload')
+            print(f"{current_downloads=}")
             if len(current_downloads) == 0:
                 break
 
@@ -218,11 +243,32 @@ class Downloader:
         except KeyError as e:
             logging.debug('{} not provided for {}, skipping...'.format(e.args[0], agency))
             raise NotLoggedInException
-        self.browser.find_element_by_css_selector(self.selectors[agency]['login']).send_keys(login)
-        self.browser.find_element_by_css_selector(self.selectors[agency]['password']).send_keys(password)
-        self.browser.find_element_by_css_selector(self.selectors[agency]['submit']).click()
+
+        try:
+            self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['accept']).click()
+        except Exception as e:
+            print(e)
+        try:
+            self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['sign_in']).click()
+        except Exception as e:
+            print(e)
+
+        if self.selectors[agency]['login']:
+            WebDriverWait(self.browser, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, self.selectors[agency]['login'])))
+            print("Element is visible? " + str(self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['login']).is_displayed()))
+            #self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['login']).click()
+            self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['login']).send_keys(login)
+        if self.selectors[agency]['password']:
+            self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['password']).send_keys(password)
+        if self.selectors[agency]['submit']:
+            time.sleep(5)
+            self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['submit']).click()
+
+
 
     def download(self, agency):
+        paths = []
+        login = False
         try:
             path = self.config[agency]['path']
         except KeyError as e:
@@ -231,10 +277,14 @@ class Downloader:
             else:
                 logging.debug('{} not provided for {}, skipping...'.format(e.args[0], agency))
         downloads_before = glob.glob(self.downloads_path + '*.zip')
+
         for step in path.split('\n'):
+            print(f"{step=}")
             if step == 'login':
                 try:
                     self.login(agency)
+                    login = True
+
                 except NotLoggedInException:
                     return
             elif step == 'scroll_down':
@@ -242,17 +292,34 @@ class Downloader:
             elif step == 'click_form':
                 self.browser.find_element_by_css_selector(self.selectors[agency]['form']).click()
             elif step == 'click_accept':
-                self.browser.find_element_by_css_selector(self.selectors[agency]['accept']).click()
+                self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['accept_download']).click()
+                login = True
             else:
                 self.browser.get(step)
+
+            if login or (not login and not self.selectors[agency]['download']):
+                try:
+                    self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['download']).click()
+                    self.is_download_completed()
+                except Exception as e:
+                    print(e)
+
+
             time.sleep(3)
-        for link in self.browser.find_elements_by_css_selector(self.selectors[agency]['download']):
-            link.click()
-            self.is_download_completed()
+        time.sleep(60)
         downloads_after = glob.glob(self.downloads_path + '*.zip')
+        print(f"{downloads_after=}")
         for path in downloads_after:
             if path not in downloads_before:
-                yield path
+                paths.append(path)
+        # for link in self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['download']):
+        #     link.click()
+        #     self.is_download_completed()
+        # downloads_after = glob.glob(self.downloads_path + '*.zip')
+        # for path in downloads_after:
+        #     if path not in downloads_before:
+        #         yield path
+        return paths
 
 
 def dict_to_list(d, row_template, rows):
@@ -272,7 +339,11 @@ def dict_to_list(d, row_template, rows):
 
 def parse_xml(file_path):
     with open(file_path, 'rb') as f:
-        dict_data = xmltodict.parse(f.read())
+        g = f.read()
+        try:
+            dict_data = xmltodict.parse(g)
+        except:
+            return []
     list_data_raw = []
     print(file_path)
     try:
@@ -298,6 +369,9 @@ def parse_xml(file_path):
             row['RAN'] = ran
     return list_data
 
+#parse_xml("../tmp/xml_path/KBRA-CALI_2019-101C-2022-05-01.xml")
+#parse_xml("../tmp/xml_path/KBRA-California_Earthquake_Authority-2022-05-01.xml")
+#input()
 
 def process_zip_file(file_path, source, exporter):
     logging.debug('{} zip file downloaded to {}'.format(source, file_path))
@@ -328,6 +402,7 @@ def clear_dir(dir):
 
 
 if __name__ == '__main__':
+
     config = configparser.ConfigParser()
     config.read('conf.ini')
 
@@ -336,9 +411,9 @@ if __name__ == '__main__':
         filemode='a', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s'
     )
 
-    if config.getboolean('general', 'headless_mode', fallback=True):
-        display = Display(visible=0, size=(1920, 1080))
-        display.start()
+    #if config.getboolean('general', 'headless_mode', fallback=True):
+    #    display = Display(visible=0, size=(1920, 1080))
+    #    display.start()
 
     downloads_path = config.get('general', 'downloads_path', fallback='/tmp/downloads/')
     if not os.path.exists(downloads_path):
@@ -352,6 +427,7 @@ if __name__ == '__main__':
     elif not os.path.isdir(xml_path):
         print('ERROR: xml_path parameter points to file!')
         sys.exit(1)
+    print(config)
     csv_path = config.get('general', 'csv_path', fallback='/tmp/csv_path/')
     if not os.path.exists(csv_path):
         os.mkdir(csv_path)
@@ -367,13 +443,16 @@ if __name__ == '__main__':
     downloader = Downloader(config)
 
     exporter = CSVExporter(csv_path)
-    for agency in ['moodies', 'standardandpoors', 'krollbond', 'dbrs', 'morningstar', 'eganjones', 'hrratings', 'ambest', 'jcr']:
+    #['moodies', 'standardandpoors', 'krollbond', 'dbrs', 'morningstar', 'eganjones', 'hrratings', 'ambest', 'jcr']
+    for agency in ['dbrs', 'morningstar', 'eganjones', 'hrratings', 'ambest', 'jcr']:
         paths = downloader.download(agency)
+        #paths = ['/home/badazhkov/Documents/Python/Rating_history/rating_history/tmp/downloads/DBRS-RatingHistory-2022-05-09.zip']
+        print(f"{paths=}")
         if paths:
             if wipe_old_files:
                 pass
             for path in paths:
-                print(path)
+                print(f"{path=}")
                 process_zip_file(path, agency.capitalize, exporter)
     logging.debug('Rating history conversion finished!')
     downloader.browser.quit()

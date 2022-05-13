@@ -46,13 +46,13 @@ HEADER = (
 if __name__ == '__main__':
     out_file = open('/tmp/ratings_for_upload.csv', 'w')
     writer = csv.writer(out_file)
-    writer.write(HEADER)
+    writer.writerow(HEADER)  #!!!
     for file_name in os.listdir('/var/csv_path/'):
         in_file = open(os.path.join('/var/csv_path/', file_name), 'r')
         reader = csv.reader(in_file)
         reader.next()
         for row in reader:
-            writer.write(row)
+            writer.writerow(row) #!!!
         in_file.close()
         out_file.flush()
     out_file.close()
