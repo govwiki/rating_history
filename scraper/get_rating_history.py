@@ -155,17 +155,32 @@ class Downloader:
             'accept': '#onetrust-accept-btn-handler',
         },
         'standardandpoors': {
-            'login': '#_oamloginportlet_WAR_rdsmregistrationportlet_email',
-            'password': '#_oamloginportlet_WAR_rdsmregistrationportlet_password',
-            'submit': '#submitForm',
-            'download': 'div.ratings-history-files a',
+            'login': '#username01',
+            'password': '#password01',
+            'submit': '.button-text',
+            'accept_download': '#onetrust-accept-btn-handler',
+            'download': [
+                'div.table-module__row:nth-child(1) > div:nth-child(1) > p:nth-child(1) > span:nth-child(1)',
+                'div.table-module__row:nth-child(2) > div:nth-child(1) > p:nth-child(1) > span:nth-child(1)',
+                'div.table-module__row:nth-child(3) > div:nth-child(1) > p:nth-child(1) > span:nth-child(1)',
+                'div.table-module__row:nth-child(4) > div:nth-child(1) > p:nth-child(1) > span:nth-child(1)',
+                'div.table-module__row:nth-child(5) > div:nth-child(1) > p:nth-child(1) > span:nth-child(1)',
+                'div.table-module__row:nth-child(6) > div:nth-child(1) > p:nth-child(1) > span:nth-child(1)',
+                'div.table-module__row:nth-child(7) > div:nth-child(1) > p:nth-child(1) > span:nth-child(1)',
+                'div.table-module__row:nth-child(1) > div:nth-child(2) > p:nth-child(1) > span:nth-child(1)',
+                'div.table-module__row:nth-child(2) > div:nth-child(2) > p:nth-child(1) > span:nth-child(1)',
+                'div.table-module__row:nth-child(3) > div:nth-child(2) > p:nth-child(1) > span:nth-child(1)',
+                'div.table-module__row:nth-child(4) > div:nth-child(2) > p:nth-child(1) > span:nth-child(1)',
+                'div.table-module__row:nth-child(5) > div:nth-child(2) > p:nth-child(1) > span:nth-child(1)',
+                'div.table-module__row:nth-child(6) > div:nth-child(2) > p:nth-child(1) > span:nth-child(1)'
+            ],
         },
         'fitchratings': {
+            'accept': '#_evidon-accept-button',
             'login': False,
             'password': False,
             'submit': False,
-            'download': False,
-            'accept': '#btn-1',
+            'download': '#btn-1',
         },
         'kbra': {
             'login': '#username',
@@ -190,7 +205,8 @@ class Downloader:
             'download': '#rule_17g-7 a',
         },
         'hrratings': {
-            'download': 'div.col.wMini>div>p>a',
+            'login': False,
+            'download': '.content-suboptions > div:nth-child(2) > a:nth-child(1)'
         },
         'ambest': {
             'login': '#EMAIL',
@@ -199,7 +215,10 @@ class Downloader:
             'download': 'table.styledTable a',
         },
         'jcr': {
-            'download': 'td.zip a',
+            'login': False,
+            'password': False,
+            'submit': False,
+            'download': '.zip > a:nth-child(1)',
         },
     }
 
@@ -256,7 +275,6 @@ class Downloader:
         if self.selectors[agency]['login']:
             WebDriverWait(self.browser, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, self.selectors[agency]['login'])))
             print("Element is visible? " + str(self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['login']).is_displayed()))
-            #self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['login']).click()
             self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['login']).send_keys(login)
         if self.selectors[agency]['password']:
             self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['password']).send_keys(password)
@@ -277,7 +295,7 @@ class Downloader:
             else:
                 logging.debug('{} not provided for {}, skipping...'.format(e.args[0], agency))
         downloads_before = glob.glob(self.downloads_path + '*.zip')
-
+        print(path.split('\n'))
         for step in path.split('\n'):
             print(f"{step=}")
             if step == 'login':
@@ -289,18 +307,29 @@ class Downloader:
                     return
             elif step == 'scroll_down':
                 self.browser.execute_script('window.scrollTo(0, document.body.scrollHeight)')
-            elif step == 'click_form':
-                self.browser.find_element_by_css_selector(self.selectors[agency]['form']).click()
             elif step == 'click_accept':
                 self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['accept_download']).click()
+                time.sleep(1)
                 login = True
             else:
                 self.browser.get(step)
-
-            if login or (not login and not self.selectors[agency]['download']):
                 try:
-                    self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['download']).click()
-                    self.is_download_completed()
+                    self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['accept']).click()
+                except Exception as e:
+                    print(e)
+
+            if login or (not login and not self.selectors[agency]['login']):
+                try:
+                    if type(self.selectors[agency]['download']) is str:
+                        WebDriverWait(self.browser, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, self.selectors[agency]['download'])))
+                        time.sleep(5)
+                        self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['download']).click()
+                        self.is_download_completed()
+                    if type(self.selectors[agency]['download']) is list:
+                        for downl in self.selectors[agency]['download']:
+                            self.browser.find_element(By.CSS_SELECTOR, downl).click()
+                            self.is_download_completed()
+
                 except Exception as e:
                     print(e)
 
@@ -312,13 +341,7 @@ class Downloader:
         for path in downloads_after:
             if path not in downloads_before:
                 paths.append(path)
-        # for link in self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['download']):
-        #     link.click()
-        #     self.is_download_completed()
-        # downloads_after = glob.glob(self.downloads_path + '*.zip')
-        # for path in downloads_after:
-        #     if path not in downloads_before:
-        #         yield path
+
         return paths
 
 
@@ -368,10 +391,6 @@ def parse_xml(file_path):
         for row in list_data:
             row['RAN'] = ran
     return list_data
-
-#parse_xml("../tmp/xml_path/KBRA-CALI_2019-101C-2022-05-01.xml")
-#parse_xml("../tmp/xml_path/KBRA-California_Earthquake_Authority-2022-05-01.xml")
-#input()
 
 def process_zip_file(file_path, source, exporter):
     logging.debug('{} zip file downloaded to {}'.format(source, file_path))
@@ -444,9 +463,8 @@ if __name__ == '__main__':
 
     exporter = CSVExporter(csv_path)
     #['moodies', 'standardandpoors', 'krollbond', 'dbrs', 'morningstar', 'eganjones', 'hrratings', 'ambest', 'jcr']
-    for agency in ['dbrs', 'morningstar', 'eganjones', 'hrratings', 'ambest', 'jcr']:
+    for agency in ['hrratings']:
         paths = downloader.download(agency)
-        #paths = ['/home/badazhkov/Documents/Python/Rating_history/rating_history/tmp/downloads/DBRS-RatingHistory-2022-05-09.zip']
         print(f"{paths=}")
         if paths:
             if wipe_old_files:
