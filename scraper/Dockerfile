@@ -1,18 +1,31 @@
-FROM debian:stable
+FROM python:3.8.10
 
-RUN apt update && apt install -y xvfb unzip libgconf-2-4 chromium python3 python3-pip
+ENV PYTHONUNBUFFERED 1
+USER root
 
-ADD https://chromedriver.storage.googleapis.com/2.33/chromedriver_linux64.zip /tmp/
-RUN unzip /tmp/chromedriver_linux64.zip -d /usr/local/bin/
-COPY requirements.txt /rating_history/requirements.txt
-RUN pip3 install -r /rating_history/requirements.txt
-COPY get_rating_history.py /rating_history/get_rating_history.py
-COPY conf.ini /rating_history/conf.ini
+#RUN apt-get update && \
+#    apt-get install -y --no-install-recommends gcc
+#
+#RUN python -m venv /opt/venv
+#ENV PATH="/opt/venv/bin:$PATH"
 
-WORKDIR /rating_history/
-RUN apt install -y locales && rm -rf /var/lib/apt/lists/* \
-    && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
-ENV LANG en_US.UTF-8
-ENV LANGUAGE en_US:en
-ENV LC_ALL en_US.UTF-8
-CMD python3 get_rating_history.py
+# install google chrome
+RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
+RUN sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+RUN apt-get -y update
+RUN apt-get install -y google-chrome-stable
+
+# install chromedriver
+RUN apt-get install -yqq unzip
+RUN wget -O /tmp/chromedriver.zip http://chromedriver.storage.googleapis.com/`curl -sS chromedriver.storage.googleapis.com/LATEST_RELEASE`/chromedriver_linux64.zip
+RUN unzip /tmp/chromedriver.zip chromedriver -d /usr/local/bin/
+
+ENV DISPLAY=:99
+
+RUN mkdir /scraper
+WORKDIR /scraper
+
+COPY . /scraper/
+
+RUN pip install -r requirements.txt
+CMD unlink /tmp/download/JCR-2022-04-30.zip

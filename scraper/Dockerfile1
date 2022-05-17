@@ -1,0 +1,46 @@
+FROM debian:stable
+
+RUN apt update                             \
+ && apt install -y --no-install-recommends \
+    ca-certificates curl firefox-esr \
+     && rm -fr /var/lib/apt/lists/*                \
+ && curl -L https://github.com/mozilla/geckodriver/releases/download/v0.31.0/geckodriver-v0.31.0-linux64.tar.gz | tar xz -C /usr/local/bin \
+ && apt purge -y ca-certificates curl
+
+RUN apt update && apt install -y xvfb unzip libgconf-2-4 chromium python3 python3-pip
+
+#ADD https://chromedriver.storage.googleapis.com/2.33/chromedriver_linux64.zip /tmp/
+#RUN unzip /tmp/chromedriver_linux64.zip -d /usr/local/bin/
+
+#ADD https://github.com/mozilla/geckodriver/releases/download/v0.31.0/geckodriver-v0.31.0-linux64.tar.gz /tmp/
+#RUN unzip /tmp/geckodriver-v0.31.0-linux64.tar.gz -d /usr/local/bin/
+
+
+
+
+
+#ADD geckodriver /usr/local/bin/geckodriver
+#COPY geckodriver-v0.31.0-linux64.tar.gz /root/.wdm/drivers/geckodriver/linux64/v0.31.0/geckodriver-v0.31.0-linux64.tar.gz
+#COPY geckodriver /root/.wdm/drivers/geckodriver/linux64/v0.31.0/geckodriver
+#COPY geckodriver /rating_history/geckodriver
+COPY requirements.txt /rating_history/requirements.txt
+RUN pip3 install -r /rating_history/requirements.txt
+COPY get_rating_history.py /rating_history/get_rating_history.py
+COPY conf.ini /rating_history/conf.ini
+
+#RUN chmod 777 /root/
+#RUN chmod 777 /root/.wdm/
+#RUN chmod 777 /root/.wdm/drivers/
+#RUN chmod 777 /root/.wdm/drivers/geckodriver/
+#RUN chmod 777 /root/.wdm/drivers/geckodriver/linux64/
+#RUN chmod 777 /root/.wdm/drivers/geckodriver/linux64/v0.31.0/
+#RUN chmod 777 /root/.wdm/drivers/geckodriver/linux64/v0.31.0/geckodriver
+
+
+WORKDIR /rating_history/
+#RUN apt install -y locales && rm -rf /var/lib/apt/lists/* \
+#    && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
+#ENV LANG en_US.UTF-8
+#ENV LANGUAGE en_US:en
+#ENV LC_ALL en_US.UTF-8
+CMD python3 get_rating_history.py

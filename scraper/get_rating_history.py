@@ -1,8 +1,9 @@
-from pyvirtualdisplay import Display
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from collections import OrderedDict
 import dateparser
 import xmltodict
@@ -18,6 +19,7 @@ import glob
 import configparser
 
 from webdriver_manager.firefox import GeckoDriverManager
+from webdriver_manager.chrome import ChromeDriverManager
 
 
 
@@ -62,7 +64,9 @@ class CSVExporter:
 
     def __init__(self, csv_path):
         self.csv_path = csv_path
-        self.db = sqlite3.connect('../var/db/ratings.sqlite3')
+        self.db = sqlite3.connect('/var/db/ratings.sqlite3')#..
+        print(f"{self.column_names_map=}")
+
 
     def get_agency_id(self, name):
         c = self.db.cursor()
@@ -136,9 +140,8 @@ class CSVExporter:
     def close(self):
         for v in self.files_created.values():
             v['file'].close()
-            self.save_file_record(
-                os.path.realpath(v['file'].name), v['agency']
-            )
+            print(f"{v['file'].name=} {v['agency']=}")
+            self.save_file_record(os.path.realpath(v['file'].name), v['agency'])
 
 
 class NotLoggedInException(Exception):
@@ -231,18 +234,43 @@ class Downloader:
         print(f"{self.downloads_path=}")
         self.config = config
 
-        options = webdriver.FirefoxOptions()
-        options.add_argument("user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:65.0) Gecko/20100101 Firefox/65.0")
-        #options.headless = True
-        profile = webdriver.FirefoxProfile()
-        profile.set_preference("browser.download.folderList", 2)
-        profile.set_preference("browser.download.manager.showWhenStarting", False)
-        profile.set_preference("browser.download.manager.useWindow", True)
-        profile.set_preference("browser.download.dir", self.downloads_path)
-        profile.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/pdf,application/msword,text/csv")
-        profile.set_preference("pdfjs.disabled", True)
+        # options = webdriver.FirefoxOptions()
+        # options.add_argument("user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:65.0) Gecko/20100101 Firefox/65.0")
+        # #options.headless = True
+        # profile = webdriver.FirefoxProfile()
+        # profile.set_preference("browser.download.folderList", 2)
+        # profile.set_preference("browser.download.manager.showWhenStarting", False)
+        # profile.set_preference("browser.download.manager.useWindow", True)
+        # profile.set_preference("browser.download.dir", self.downloads_path)
+        # profile.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/pdf,application/msword,text/csv")
+        # profile.set_preference("pdfjs.disabled", True)
 
-        self.browser = webdriver.Firefox(executable_path=GeckoDriverManager().install(), options=options, firefox_profile=profile)
+        chrome_options = webdriver.ChromeOptions()
+        chrome_options = webdriver.chrome.options.Options()
+        prefs = {"download.default_directory": self.downloads_path,
+                 "download.prompt_for_download": False,
+                 "download.directory_upgrade": True}
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--headless')
+        chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_experimental_option('prefs', prefs)
+        self.browser = webdriver.Chrome(chrome_options=chrome_options)#executable_path=ChromeDriverManager().install(),
+        params = {'behavior': 'allow', 'downloadPath': self.downloads_path}
+        self.browser.execute_cdp_cmd('Page.setDownloadBehavior', params)
+
+        capabilities = {
+            "browserName": "firefox",
+            "version": "100.0"
+        }
+        print(f"! {os.path.exists('/root/.wdm/drivers/geckodriver/linux64/v0.31.0/geckodriver')}")
+        # self.browser = webdriver.Remote(
+        #     command_executor='http://selenoid:4444/wd/hub',
+        #     desired_capabilities=DesiredCapabilities.FIREFOX,
+        #     options=options,
+        #     browser_profile=profile
+        # )
+        #self.browser = webdriver.Firefox(executable_path=GeckoDriverManager().install(), options=options, firefox_profile=profile)
+        #self.browser = webdriver.Firefox(executable_path="./geckodriver", options=options, firefox_profile=profile)
 
         self.browser.implicitly_wait(10)
         logging.debug('Browser started')
@@ -285,6 +313,7 @@ class Downloader:
 
 
     def download(self, agency):
+        print(f"{self.downloads_path=}")
         paths = []
         login = False
         try:
@@ -335,7 +364,7 @@ class Downloader:
 
 
             time.sleep(3)
-        time.sleep(60)
+        time.sleep(1)
         downloads_after = glob.glob(self.downloads_path + '*.zip')
         print(f"{downloads_after=}")
         for path in downloads_after:
@@ -346,8 +375,12 @@ class Downloader:
 
 
 def dict_to_list(d, row_template, rows):
+    # print(f"{d=}")
+    # print(f"{row_template=}")
+    # print(f"{rows=}")
     for key in d:
-        if isinstance(d[key], OrderedDict):
+        #print(type(d[key]))
+        if isinstance(d[key], dict):#OrderedDict
             if '#text' in d[key]:
                 row_template[key] = d[key]['#text']
             else:
@@ -382,6 +415,10 @@ def parse_xml(file_path):
     dict_to_list(target_data, OrderedDict(), list_data_raw)
     max_len = max([len(r) for r in list_data_raw])
     list_data = [r for r in list_data_raw if len(r) == max_len]
+    # print(f"{list_data_raw=}")
+    # print(f"{list_data=}")
+    # print(f"{dict_data['xbrli:xbrl']=}")
+    #time.sleep(1800)
     if 'FCD' not in list_data[0] and 'r:FCD' not in list_data[0] and 'rt:FCD' not in list_data[0]:
         fcd = dict_data['xbrli:xbrl']['FCD']['#text']
         for row in list_data:
@@ -421,7 +458,7 @@ def clear_dir(dir):
 
 
 if __name__ == '__main__':
-
+    time.sleep(1800)
     config = configparser.ConfigParser()
     config.read('conf.ini')
 
@@ -463,7 +500,7 @@ if __name__ == '__main__':
 
     exporter = CSVExporter(csv_path)
     #['moodies', 'standardandpoors', 'krollbond', 'dbrs', 'morningstar', 'eganjones', 'hrratings', 'ambest', 'jcr']
-    for agency in ['hrratings']:
+    for agency in ['jcr']:
         paths = downloader.download(agency)
         print(f"{paths=}")
         if paths:
