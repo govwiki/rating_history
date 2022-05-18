@@ -2,7 +2,7 @@ FROM python:3.8.10
 
 ENV PYTHONUNBUFFERED 1
 USER root
-
+RUN pip install --upgrade pip
 #RUN apt-get update && \
 #    apt-get install -y --no-install-recommends gcc
 #
@@ -28,4 +28,5 @@ WORKDIR /scraper
 COPY . /scraper/
 
 RUN pip install -r requirements.txt
+
 CMD unlink /tmp/download/JCR-2022-04-30.zip

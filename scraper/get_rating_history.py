@@ -1,9 +1,7 @@
-
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from collections import OrderedDict
 import dateparser
 import xmltodict
@@ -64,9 +62,7 @@ class CSVExporter:
 
     def __init__(self, csv_path):
         self.csv_path = csv_path
-        self.db = sqlite3.connect('/var/db/ratings.sqlite3')#..
-        print(f"{self.column_names_map=}")
-
+        self.db = sqlite3.connect('/var/db/ratings.sqlite3')
 
     def get_agency_id(self, name):
         c = self.db.cursor()
@@ -194,7 +190,7 @@ class Downloader:
         },
         'dbrs': {
             'accept': '.button--fullWidth',
-            'sign_in': '.button--secondary',
+            'sign_in': 'body > app-root > app-site-header > div > nav.main-nav > div > ul > li.main-nav-item--mobile.login-btn.ng-star-inserted > a',
             'login': '#usernameField',
             'password': '#passwordField',
             'submit': '#btn-login',
@@ -209,7 +205,7 @@ class Downloader:
         },
         'hrratings': {
             'login': False,
-            'download': '.content-suboptions > div:nth-child(2) > a:nth-child(1)'
+            'link': True
         },
         'ambest': {
             'login': '#EMAIL',
@@ -229,24 +225,10 @@ class Downloader:
 
         direct = os.path.dirname(os.path.abspath(__file__)).split('/')
         direct = '/'.join(direct[:-1])
-        print(direct)
         self.downloads_path = direct + config.get('general', 'downloads_path', fallback='/tmp/downloads/')
-        print(f"{self.downloads_path=}")
         self.config = config
 
-        # options = webdriver.FirefoxOptions()
-        # options.add_argument("user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:65.0) Gecko/20100101 Firefox/65.0")
-        # #options.headless = True
-        # profile = webdriver.FirefoxProfile()
-        # profile.set_preference("browser.download.folderList", 2)
-        # profile.set_preference("browser.download.manager.showWhenStarting", False)
-        # profile.set_preference("browser.download.manager.useWindow", True)
-        # profile.set_preference("browser.download.dir", self.downloads_path)
-        # profile.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/pdf,application/msword,text/csv")
-        # profile.set_preference("pdfjs.disabled", True)
-
         chrome_options = webdriver.ChromeOptions()
-        chrome_options = webdriver.chrome.options.Options()
         prefs = {"download.default_directory": self.downloads_path,
                  "download.prompt_for_download": False,
                  "download.directory_upgrade": True}
@@ -254,23 +236,9 @@ class Downloader:
         chrome_options.add_argument('--headless')
         chrome_options.add_argument('--disable-gpu')
         chrome_options.add_experimental_option('prefs', prefs)
-        self.browser = webdriver.Chrome(chrome_options=chrome_options)#executable_path=ChromeDriverManager().install(),
+        self.browser = webdriver.Chrome(executable_path=ChromeDriverManager().install(), chrome_options=chrome_options)
         params = {'behavior': 'allow', 'downloadPath': self.downloads_path}
         self.browser.execute_cdp_cmd('Page.setDownloadBehavior', params)
-
-        capabilities = {
-            "browserName": "firefox",
-            "version": "100.0"
-        }
-        print(f"! {os.path.exists('/root/.wdm/drivers/geckodriver/linux64/v0.31.0/geckodriver')}")
-        # self.browser = webdriver.Remote(
-        #     command_executor='http://selenoid:4444/wd/hub',
-        #     desired_capabilities=DesiredCapabilities.FIREFOX,
-        #     options=options,
-        #     browser_profile=profile
-        # )
-        #self.browser = webdriver.Firefox(executable_path=GeckoDriverManager().install(), options=options, firefox_profile=profile)
-        #self.browser = webdriver.Firefox(executable_path="./geckodriver", options=options, firefox_profile=profile)
 
         self.browser.implicitly_wait(10)
         logging.debug('Browser started')
@@ -291,10 +259,11 @@ class Downloader:
             logging.debug('{} not provided for {}, skipping...'.format(e.args[0], agency))
             raise NotLoggedInException
 
-        try:
-            self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['accept']).click()
-        except Exception as e:
-            print(e)
+        if 'accept' in self.selectors[agency]:
+            try:
+                self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['accept']).click()
+            except Exception as e:
+                print(e)
         try:
             self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['sign_in']).click()
         except Exception as e:
@@ -302,7 +271,6 @@ class Downloader:
 
         if self.selectors[agency]['login']:
             WebDriverWait(self.browser, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, self.selectors[agency]['login'])))
-            print("Element is visible? " + str(self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['login']).is_displayed()))
             self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['login']).send_keys(login)
         if self.selectors[agency]['password']:
             self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['password']).send_keys(password)
@@ -310,10 +278,7 @@ class Downloader:
             time.sleep(5)
             self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['submit']).click()
 
-
-
     def download(self, agency):
-        print(f"{self.downloads_path=}")
         paths = []
         login = False
         try:
@@ -324,6 +289,7 @@ class Downloader:
             else:
                 logging.debug('{} not provided for {}, skipping...'.format(e.args[0], agency))
         downloads_before = glob.glob(self.downloads_path + '*.zip')
+        print(f"{downloads_before=}")
         print(path.split('\n'))
         for step in path.split('\n'):
             print(f"{step=}")
@@ -331,7 +297,8 @@ class Downloader:
                 try:
                     self.login(agency)
                     login = True
-
+                    if 'click_accept' in path.split('\n'):
+                        login = False
                 except NotLoggedInException:
                     return
             elif step == 'scroll_down':
@@ -342,26 +309,33 @@ class Downloader:
                 login = True
             else:
                 self.browser.get(step)
-                try:
-                    self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['accept']).click()
-                except Exception as e:
-                    print(e)
+                if 'link' in self.selectors[agency]:
+                    self.is_download_completed()
+                if 'accept' in self.selectors[agency]:
+                    try:
+                        self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['accept']).click()
+                    except Exception as e:
+                        print(e)
 
             if login or (not login and not self.selectors[agency]['login']):
                 try:
-                    if type(self.selectors[agency]['download']) is str:
+                    print("begin download")
+                    if 'download' in self.selectors[agency] and type(self.selectors[agency]['download']) is str:
                         WebDriverWait(self.browser, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, self.selectors[agency]['download'])))
                         time.sleep(5)
                         self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['download']).click()
                         self.is_download_completed()
-                    if type(self.selectors[agency]['download']) is list:
+                    if 'download' in self.selectors[agency] and type(self.selectors[agency]['download']) is list:
                         for downl in self.selectors[agency]['download']:
+                            print(downl)
+                            WebDriverWait(self.browser, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, downl)))
                             self.browser.find_element(By.CSS_SELECTOR, downl).click()
                             self.is_download_completed()
 
                 except Exception as e:
                     print(e)
-
+                    print(f"{agency} trying FAIL!")
+                    return False
 
             time.sleep(3)
         time.sleep(1)
@@ -375,12 +349,8 @@ class Downloader:
 
 
 def dict_to_list(d, row_template, rows):
-    # print(f"{d=}")
-    # print(f"{row_template=}")
-    # print(f"{rows=}")
     for key in d:
-        #print(type(d[key]))
-        if isinstance(d[key], dict):#OrderedDict
+        if isinstance(d[key], dict) or isinstance(d[key], OrderedDict):#OrderedDict
             if '#text' in d[key]:
                 row_template[key] = d[key]['#text']
             else:
@@ -415,10 +385,6 @@ def parse_xml(file_path):
     dict_to_list(target_data, OrderedDict(), list_data_raw)
     max_len = max([len(r) for r in list_data_raw])
     list_data = [r for r in list_data_raw if len(r) == max_len]
-    # print(f"{list_data_raw=}")
-    # print(f"{list_data=}")
-    # print(f"{dict_data['xbrli:xbrl']=}")
-    #time.sleep(1800)
     if 'FCD' not in list_data[0] and 'r:FCD' not in list_data[0] and 'rt:FCD' not in list_data[0]:
         fcd = dict_data['xbrli:xbrl']['FCD']['#text']
         for row in list_data:
@@ -432,7 +398,6 @@ def parse_xml(file_path):
 def process_zip_file(file_path, source, exporter):
     logging.debug('{} zip file downloaded to {}'.format(source, file_path))
     zip_file = zipfile.ZipFile(file_path)
-    list_content = []
     for file_name in zip_file.namelist():
         if file_name.endswith('.xml'):
             try:
@@ -458,7 +423,7 @@ def clear_dir(dir):
 
 
 if __name__ == '__main__':
-    time.sleep(1800)
+    #time.sleep(1800)
     config = configparser.ConfigParser()
     config.read('conf.ini')
 
@@ -466,10 +431,6 @@ if __name__ == '__main__':
         filename=config.get('general', 'log_file', fallback='rating_history_extracter.log'),
         filemode='a', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s'
     )
-
-    #if config.getboolean('general', 'headless_mode', fallback=True):
-    #    display = Display(visible=0, size=(1920, 1080))
-    #    display.start()
 
     downloads_path = config.get('general', 'downloads_path', fallback='/tmp/downloads/')
     if not os.path.exists(downloads_path):
@@ -483,7 +444,6 @@ if __name__ == '__main__':
     elif not os.path.isdir(xml_path):
         print('ERROR: xml_path parameter points to file!')
         sys.exit(1)
-    print(config)
     csv_path = config.get('general', 'csv_path', fallback='/tmp/csv_path/')
     if not os.path.exists(csv_path):
         os.mkdir(csv_path)
@@ -497,11 +457,12 @@ if __name__ == '__main__':
 
     logging.debug('Started')
     downloader = Downloader(config)
-
     exporter = CSVExporter(csv_path)
-    #['moodies', 'standardandpoors', 'krollbond', 'dbrs', 'morningstar', 'eganjones', 'hrratings', 'ambest', 'jcr']
-    for agency in ['jcr']:
+    #['moodies', 'standardandpoors', 'fitchratings', 'kbra' 'dbrs', 'ambest', 'hrratings', 'jcr']
+    for agency in ['hrratings', 'jcr']:
         paths = downloader.download(agency)
+        if paths == False:
+            downloader = Downloader(config)
         print(f"{paths=}")
         if paths:
             if wipe_old_files:

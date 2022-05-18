@@ -8,34 +8,8 @@ services:
       - csv_path:/var/csv_path/
       - db_path:/var/db/
     command: python get_rating_history.py
+    shm_size: 1gb
 
-
-#  selenoid:
-#      image: aerokube/selenoid:latest
-#      volumes:
-#        - ../config:/etc/selenoid
-#        - "/var/run/docker.sock:/var/run/docker.sock"
-#        - "$PWD/video:/opt/selenoid/video"
-#        - "$PWD/logs:/opt/selenoid/logs"
-#      environment:
-#        - OVERRIDE_VIDEO_OUTPUT_DIR=/path/to/config/video
-#      #command: [ "-conf", "/etc/selenoid/browsers.json", "-video-output-dir", "/opt/selenoid/video", "-log-output-dir", "/opt/selenoid/logs" ]
-#      command: ["--container-network", "selenoid_default", "-limit", "8", "-timeout","5m"]
-#      ports:
-#        - "4444:4444" #30444
-#
-#  selenoid-ui:
-#      image: aerokube/selenoid-ui
-#      container_name: "selenoid-ui"
-#      links:
-#        - selenoid
-#      ports:
-#        - "8080:8080"
-#      command: [ "--container-network", "selenoid_default"]
-#      command: ["--selenoid-uri", "http://selenoid:4444"]
-#
-#
-#
   web-app:
     container_name: ratings_web_app
     build: ./ratings_web_app
@@ -43,13 +17,13 @@ services:
       - csv_path:/var/csv_path/
       - db_path:/var/db/
     ports:
-      - "80:8080"
-#
-#  uploader:
-#    container_name: dataworld_uploader
-#    build: ./data.world_upload/
-#    volumes:
-#      - csv_path:/var/csv_path/
+      - 80:8080
+
+  uploader:
+    container_name: dataworld_uploader
+    build: ./data.world_upload/
+    volumes:
+      - csv_path:/var/csv_path/
 
 
 volumes:

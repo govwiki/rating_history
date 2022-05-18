@@ -1,5 +1,7 @@
 import csv
 import os
+import time
+
 import requests
 
 
@@ -44,23 +46,23 @@ HEADER = (
 
 
 if __name__ == '__main__':
-    out_file = open('../tmp/ratings_for_upload.csv', 'w')
-    writer = csv.writer(out_file)
-    writer.writerow(HEADER)  #!!!
-    for file_name in os.listdir('../var/csv_path/'):
-        in_file = open(os.path.join('../var/csv_path/', file_name), 'r')
-        reader = csv.reader(in_file)
-        reader.next()
-        for row in reader:
-            writer.writerow(row) #!!!
-        in_file.close()
-        out_file.flush()
-    out_file.close()
+    with open('/tmp/ratings_for_upload.csv', 'w') as out_file:
+        writer = csv.writer(out_file)
+        writer.writerow(HEADER)  #!!!
+        for file_name in os.listdir('/var/csv_path/'):
+            with open(os.path.join('/var/csv_path/', file_name), 'r') as in_file:
+                reader = csv.reader(in_file)
+                #reader.next()
+                for row in reader:
+                    writer.writerow(row) #!!!
+            out_file.flush()
 
-    uploaded_file = open('../tmp/ratings_for_upload.csv', 'rb')
-    headers = {'Authorization': 'Bearer {}'.format(AUTH_KEY)}
-    files = {'file': uploaded_file}
-    r = requests.post(
-        'https://api.data.world/v0/datasets/{}/api-sandbox/files'.format(USERNAME),
-        files=files, headers=headers,
-    )
+    with open('/tmp/ratings_for_upload.csv', 'rb') as uploaded_file:
+        headers = {'Authorization': f"Bearer {AUTH_KEY}"}
+        files = {'file': uploaded_file}
+        r = requests.post(
+            f"https://api.data.world/v0/datasets/{USERNAME}/api-sandbox/files",
+            files=files, headers=headers,
+        )
+    print("Upload success!")
+    time.sleep(1800)
