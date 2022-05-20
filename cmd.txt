@@ -1,0 +1,10 @@
+pip install -r /data.world_upload/requirements.txt
+pip install -r /ratings_web_app/requirements.txt
+pip install -r /scraper/requirements.txt
+
+~/ratings_web_app$ python manage.py runserver 127.0.0.1:8080
+~/ratings_web_app$ python manage.py migrate
+
+~/scraper$ python get_rating_history.py
+
+~/data.world_upload$ python upload.py

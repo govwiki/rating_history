@@ -46,18 +46,18 @@ HEADER = (
 
 
 if __name__ == '__main__':
-    with open('/tmp/ratings_for_upload.csv', 'w') as out_file:
+    with open('../tmp/ratings_for_upload.csv', 'w') as out_file:
         writer = csv.writer(out_file)
         writer.writerow(HEADER)  #!!!
-        for file_name in os.listdir('/var/csv_path/'):
-            with open(os.path.join('/var/csv_path/', file_name), 'r') as in_file:
+        for file_name in os.listdir('../var/csv_path/'):
+            with open(os.path.join('../var/csv_path/', file_name), 'r') as in_file:
                 reader = csv.reader(in_file)
                 #reader.next()
                 for row in reader:
                     writer.writerow(row) #!!!
             out_file.flush()
 
-    with open('/tmp/ratings_for_upload.csv', 'rb') as uploaded_file:
+    with open('../tmp/ratings_for_upload.csv', 'rb') as uploaded_file:
         headers = {'Authorization': f"Bearer {AUTH_KEY}"}
         files = {'file': uploaded_file}
         r = requests.post(

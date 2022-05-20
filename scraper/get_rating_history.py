@@ -60,7 +60,7 @@ class CSVExporter:
 
     def __init__(self, csv_path):
         self.csv_path = csv_path
-        self.db = sqlite3.connect('/var/db/ratings.sqlite3')
+        self.db = sqlite3.connect('../var/db/ratings.sqlite3')
 
     def get_agency_id(self, name):
         c = self.db.cursor()
@@ -223,7 +223,7 @@ class Downloader:
 
         direct = os.path.dirname(os.path.abspath(__file__)).split('/')
         direct = '/'.join(direct[:-1])
-        self.downloads_path = direct + config.get('general', 'downloads_path', fallback='/tmp/downloads/')
+        self.downloads_path = direct + config.get('general', 'downloads_path', fallback='../tmp/downloads/')
         self.config = config
 
         chrome_options = webdriver.ChromeOptions()
@@ -430,19 +430,19 @@ if __name__ == '__main__':
         filemode='a', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s'
     )
 
-    downloads_path = config.get('general', 'downloads_path', fallback='/tmp/downloads/')
+    downloads_path = config.get('general', 'downloads_path', fallback='../tmp/downloads/')
     if not os.path.exists(downloads_path):
         os.mkdir(downloads_path)
     elif not os.path.isdir(downloads_path):
         print('ERROR: downloads_path parameter points to file!')
         sys.exit(1)
-    xml_path = config.get('general', 'xml_path', fallback='/tmp/xml_path/')
+    xml_path = config.get('general', 'xml_path', fallback='../tmp/xml_path/')
     if not os.path.exists(xml_path):
         os.mkdir(xml_path)
     elif not os.path.isdir(xml_path):
         print('ERROR: xml_path parameter points to file!')
         sys.exit(1)
-    csv_path = config.get('general', 'csv_path', fallback='/tmp/csv_path/')
+    csv_path = config.get('general', 'csv_path', fallback='../tmp/csv_path/')
     if not os.path.exists(csv_path):
         os.mkdir(csv_path)
     elif not os.path.isdir(csv_path):

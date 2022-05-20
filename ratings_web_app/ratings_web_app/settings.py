@@ -77,7 +77,7 @@ WSGI_APPLICATION = 'ratings_web_app.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': '/var/db/ratings.sqlite3',
+        'NAME': '../var/db/ratings.sqlite3',
     }
 }
 
@@ -121,5 +121,5 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = 'static/'
 STATICFILES_DIR = 'assets/'
-MEDIA_ROOT = '/var/csv_path'
+MEDIA_ROOT = '../var/csv_path'
 MEDIA_URL = '/csv/'
