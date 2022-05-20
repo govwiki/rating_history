@@ -65,4 +65,4 @@ if __name__ == '__main__':
             files=files, headers=headers,
         )
     print("Upload success!")
-    time.sleep(1800)
+

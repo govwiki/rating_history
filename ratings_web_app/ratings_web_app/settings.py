@@ -121,5 +121,5 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = 'static/'
 STATICFILES_DIR = 'assets/'
-MEDIA_ROOT = '/home/templarrr/oDesk/Marc/scraper/csv_path'
+MEDIA_ROOT = '/var/csv_path'
 MEDIA_URL = '/csv/'

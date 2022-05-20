@@ -16,9 +16,7 @@ import zipfile
 import glob
 import configparser
 
-from webdriver_manager.firefox import GeckoDriverManager
 from webdriver_manager.chrome import ChromeDriverManager
-
 
 
 class CSVExporter:
@@ -459,7 +457,8 @@ if __name__ == '__main__':
     downloader = Downloader(config)
     exporter = CSVExporter(csv_path)
     #['moodies', 'standardandpoors', 'fitchratings', 'kbra' 'dbrs', 'ambest', 'hrratings', 'jcr']
-    for agency in ['hrratings', 'jcr']:
+    # ['moodies', 'standardandpoors', 'fitchratings', 'kbra' 'dbrs', 'hrratings', 'jcr']
+    for agency in ['moodies', 'standardandpoors', 'fitchratings', 'kbra' 'dbrs', 'hrratings', 'jcr']:
         paths = downloader.download(agency)
         if paths == False:
             downloader = Downloader(config)
