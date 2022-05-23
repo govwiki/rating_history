@@ -17,6 +17,9 @@ import glob
 import configparser
 
 from webdriver_manager.chrome import ChromeDriverManager
+from imaplib import IMAP4_SSL
+import re
+from bs4 import BeautifulSoup
 
 
 class CSVExporter:
@@ -146,9 +149,13 @@ class Downloader:
     selectors = {
         'moodies': {
             'login': 'div.login-name:nth-child(1) > div:nth-child(2) > input:nth-child(1)',
+            'login_id': 'okta-signin-username',
             'password': 'div.login-name:nth-child(2) > div:nth-child(2) > input:nth-child(1)',
+            'password_id': 'okta-signin-password',
             'submit': '.kIEpAt',
-            'download': '.PageContent a:last-child',
+            'submit_id': 'okta-signin-submit',
+            #'download': '.PageContent a:last-child',
+            'download_XPATH': '/html/body/app-root/main/app-sec-rule17g/app-intro-content/div[2]/div/div[2]/p[9]/a',
             'accept': '#onetrust-accept-btn-handler',
         },
         'standardandpoors': {
@@ -206,10 +213,14 @@ class Downloader:
             'link': True
         },
         'ambest': {
-            'login': '#EMAIL',
+            'login': '#txtEmail',
             'password': '#CurPwd',
-            'submit': '#btnContinue',
-            'download': 'table.styledTable a',
+            'verif_code': '#txtVerificationCode',
+            'submit': '#btnContinue > span',
+            'accept_download': '#btnVerify > span',
+            'resent_code': '#btnResendCode > span',
+            'accept': '#rdoAccept',
+            'download': '#btnSubmit',
         },
         'jcr': {
             'login': False,
@@ -223,7 +234,7 @@ class Downloader:
 
         direct = os.path.dirname(os.path.abspath(__file__)).split('/')
         direct = '/'.join(direct[:-1])
-        self.downloads_path = direct + config.get('general', 'downloads_path', fallback='../tmp/downloads/')
+        self.downloads_path = direct + config.get('general', 'downloads_path', fallback='/tmp/downloads/')
         self.config = config
 
         chrome_options = webdriver.ChromeOptions()
@@ -231,7 +242,7 @@ class Downloader:
                  "download.prompt_for_download": False,
                  "download.directory_upgrade": True}
         chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--headless')
+        #chrome_options.add_argument('--headless')
         chrome_options.add_argument('--disable-gpu')
         chrome_options.add_experimental_option('prefs', prefs)
         self.browser = webdriver.Chrome(executable_path=ChromeDriverManager().install(), chrome_options=chrome_options)
@@ -268,13 +279,39 @@ class Downloader:
             print(e)
 
         if self.selectors[agency]['login']:
-            WebDriverWait(self.browser, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, self.selectors[agency]['login'])))
-            self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['login']).send_keys(login)
+            if 'login_id' in self.selectors[agency]:
+                WebDriverWait(self.browser, 10).until(EC.element_to_be_clickable((By.ID, self.selectors[agency]['login_id'])))
+                self.browser.find_element(By.ID, self.selectors[agency]['login_id']).send_keys(login)
+            else:
+                WebDriverWait(self.browser, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, self.selectors[agency]['login'])))
+                self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['login']).send_keys(login)
         if self.selectors[agency]['password']:
-            self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['password']).send_keys(password)
+            if 'password_id' in self.selectors[agency]:
+                self.browser.find_element(By.ID, self.selectors[agency]['password_id']).send_keys(password)
+            else:
+                self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['password']).send_keys(password)
         if self.selectors[agency]['submit']:
             time.sleep(5)
-            self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['submit']).click()
+            if 'submit_id' in self.selectors[agency]:
+                self.browser.find_element(By.ID, self.selectors[agency]['submit_id']).click()
+            else:
+                self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['submit']).click()
+
+    def get_message(self, agency):
+        server = self.config[agency]['server']
+        login = self.config[agency]['login']
+        password = self.config[agency]['password_imap']
+        imap = IMAP4_SSL(host=server, port=993)
+        imap.login(login, password)
+        imap.select('inbox')
+        status, search_data = imap.search(None, 'ALL')
+        latest_mail = search_data[0].split()[-1]
+        _, data = imap.fetch(latest_mail, "(RFC822)")
+        soup = BeautifulSoup(data[0][1].decode('utf-8'), 'html.parser')
+        element = soup.find('strong').text
+        frase = re.findall(r'\d+', element)[0]
+        print(frase)
+        return frase
 
     def download(self, agency):
         paths = []
@@ -295,7 +332,7 @@ class Downloader:
                 try:
                     self.login(agency)
                     login = True
-                    if 'click_accept' in path.split('\n'):
+                    if 'click_accept' in path.split('\n') or 'imap' in path.split('\n'):
                         login = False
                 except NotLoggedInException:
                     return
@@ -305,6 +342,13 @@ class Downloader:
                 self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['accept_download']).click()
                 time.sleep(1)
                 login = True
+
+            elif step == 'imap':
+                #self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['resent_code']).click()
+                time.sleep(180)
+                verif_code = self.get_message(agency)
+                self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['verif_code']).send_keys(verif_code)
+                self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['accept_download']).click()
             else:
                 self.browser.get(step)
                 if 'link' in self.selectors[agency]:
@@ -322,6 +366,11 @@ class Downloader:
                         WebDriverWait(self.browser, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, self.selectors[agency]['download'])))
                         time.sleep(5)
                         self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['download']).click()
+                        self.is_download_completed()
+                    elif 'download_XPATH' in self.selectors[agency] and type(self.selectors[agency]['download_XPATH']) is str:
+                        WebDriverWait(self.browser, 10).until(EC.element_to_be_clickable((By.XPATH, self.selectors[agency]['download_XPATH'])))
+                        time.sleep(5)
+                        self.browser.find_element(By.XPATH, self.selectors[agency]['download_XPATH']).click()
                         self.is_download_completed()
                     if 'download' in self.selectors[agency] and type(self.selectors[agency]['download']) is list:
                         for downl in self.selectors[agency]['download']:
@@ -430,19 +479,19 @@ if __name__ == '__main__':
         filemode='a', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s'
     )
 
-    downloads_path = config.get('general', 'downloads_path', fallback='../tmp/downloads/')
+    downloads_path = config.get('general', 'downloads_path', fallback='/tmp/downloads/')
     if not os.path.exists(downloads_path):
         os.mkdir(downloads_path)
     elif not os.path.isdir(downloads_path):
         print('ERROR: downloads_path parameter points to file!')
         sys.exit(1)
-    xml_path = config.get('general', 'xml_path', fallback='../tmp/xml_path/')
+    xml_path = config.get('general', 'xml_path', fallback='/tmp/xml_path/')
     if not os.path.exists(xml_path):
         os.mkdir(xml_path)
     elif not os.path.isdir(xml_path):
         print('ERROR: xml_path parameter points to file!')
         sys.exit(1)
-    csv_path = config.get('general', 'csv_path', fallback='../tmp/csv_path/')
+    csv_path = config.get('general', 'csv_path', fallback='/tmp/csv_path/')
     if not os.path.exists(csv_path):
         os.mkdir(csv_path)
     elif not os.path.isdir(csv_path):
@@ -458,7 +507,7 @@ if __name__ == '__main__':
     exporter = CSVExporter(csv_path)
     #['moodies', 'standardandpoors', 'fitchratings', 'kbra' 'dbrs', 'ambest', 'hrratings', 'jcr']
     # ['moodies', 'standardandpoors', 'fitchratings', 'kbra' 'dbrs', 'hrratings', 'jcr']
-    for agency in ['moodies', 'standardandpoors', 'fitchratings', 'kbra' 'dbrs', 'hrratings', 'jcr']:
+    for agency in ['moodies']:
         paths = downloader.download(agency)
         if paths == False:
             downloader = Downloader(config)
