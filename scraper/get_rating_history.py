@@ -220,7 +220,8 @@ class Downloader:
             'accept_download': '#btnVerify > span',
             'resent_code': '#btnResendCode > span',
             'accept': '#rdoAccept',
-            'download': '#btnSubmit',
+            'download': 'p.form:nth-child(6) > a:nth-child(4)',
+            'add_two': '#btnDFA > span:nth-child(1)',
         },
         'jcr': {
             'login': False,
@@ -297,6 +298,16 @@ class Downloader:
             else:
                 self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['submit']).click()
 
+    def count_mes(self, agency):
+        server = self.config[agency]['server']
+        login = self.config[agency]['login']
+        password = self.config[agency]['password_imap']
+        imap = IMAP4_SSL(host=server, port=993)
+        imap.login(login, password)
+        imap.select('inbox')
+        status, search_data = imap.search(None, 'ALL')
+        self.count = len(search_data[0].split())
+
     def get_message(self, agency):
         server = self.config[agency]['server']
         login = self.config[agency]['login']
@@ -305,11 +316,28 @@ class Downloader:
         imap.login(login, password)
         imap.select('inbox')
         status, search_data = imap.search(None, 'ALL')
+        while True:
+            time.sleep(20)
+            count_mes_1 = len(search_data[0].split())
+            print(count_mes_1, self.count)
+            if count_mes_1 == self.count + 1:
+                break
+            else:
+                self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['resent_code']).click()
+                time.sleep(60)
+                count_mes_1 = len(search_data[0].split())
+                print(count_mes_1, self.count)
+                if count_mes_1 == self.count + 1:
+                    break
+
+
         latest_mail = search_data[0].split()[-1]
         _, data = imap.fetch(latest_mail, "(RFC822)")
         soup = BeautifulSoup(data[0][1].decode('utf-8'), 'html.parser')
+
         element = soup.find('strong').text
         frase = re.findall(r'\d+', element)[0]
+
         print(frase)
         return frase
 
@@ -326,7 +354,10 @@ class Downloader:
         downloads_before = glob.glob(self.downloads_path + '*.zip')
         print(f"{downloads_before=}")
         print(path.split('\n'))
+        if 'imap' in path.split('\n'):
+            self.count_mes(agency)
         for step in path.split('\n'):
+
             print(f"{step=}")
             if step == 'login':
                 try:
@@ -344,11 +375,10 @@ class Downloader:
                 login = True
 
             elif step == 'imap':
-                #self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['resent_code']).click()
-                time.sleep(180)
                 verif_code = self.get_message(agency)
                 self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['verif_code']).send_keys(verif_code)
                 self.browser.find_element(By.CSS_SELECTOR, self.selectors[agency]['accept_download']).click()
+                login = True
             else:
                 self.browser.get(step)
                 if 'link' in self.selectors[agency]:
@@ -382,14 +412,16 @@ class Downloader:
                 except Exception as e:
                     print(e)
                     print(f"{agency} trying FAIL!")
-                    return False
+                    # if agency != 'ambest':
+                    #     return False
 
             time.sleep(3)
         time.sleep(1)
         downloads_after = glob.glob(self.downloads_path + '*.zip')
         print(f"{downloads_after=}")
+        new = ['/home/sibers/Rating_history/rating_history/tmp/downloads/SP-RMBS-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-CDO-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-Corporate-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-ABCP-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-Insurance-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-INT-Public-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-CMBS-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-US-Public-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-Financial-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-Other-SFP-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/AMBEST-CREDIT-RATINGS.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-CLO-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-Other-ABS-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-Sovereign-2022-05-01.zip']
         for path in downloads_after:
-            if path not in downloads_before:
+            if path not in downloads_before or path in new:# or path == '/home/badazhkov/Documents/Python/Rating_history/rating_history/tmp/downloads/AMBEST-CREDIT-RATINGS.zip' or path == '/home/sibers/Rating_history/rating_history/tmp/downloads/AMBEST-CREDIT-RATINGS.zip':
                 paths.append(path)
 
         return paths
@@ -508,6 +540,7 @@ if __name__ == '__main__':
     #['moodies', 'standardandpoors', 'fitchratings', 'kbra' 'dbrs', 'ambest', 'hrratings', 'jcr']
     # ['moodies', 'standardandpoors', 'fitchratings', 'kbra' 'dbrs', 'hrratings', 'jcr']
     for agency in ['moodies']:
+        print(f"Begin {agency}!")
         paths = downloader.download(agency)
         if paths == False:
             downloader = Downloader(config)
@@ -521,3 +554,4 @@ if __name__ == '__main__':
     logging.debug('Rating history conversion finished!')
     downloader.browser.quit()
     exporter.close()
+    print("Finished!!")

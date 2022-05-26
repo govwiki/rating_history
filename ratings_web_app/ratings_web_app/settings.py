@@ -25,7 +25,7 @@ SECRET_KEY = 'kub6a3^57^jcq^mf^1uh#3y2of8*vv=fyzwp!joufy#agy*1#t'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["13.66.135.130", "127.0.0.1", "94.251.80.158", "localhost", "0.0.0.0"]
 
 
 # Application definition
@@ -121,5 +121,5 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = 'static/'
 STATICFILES_DIR = 'assets/'
-MEDIA_ROOT = '../var/csv_path'
+MEDIA_ROOT = '../var/csv_path/'
 MEDIA_URL = '/csv/'
