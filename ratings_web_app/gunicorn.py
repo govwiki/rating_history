@@ -1,0 +1,14 @@
+pidfile = 'app01.pid'
+worker_class = 'gthread'
+workers = 5
+worker_connections = 1000
+timeout = 30
+keepalive = 2
+threads = 2
+proc_name = 'app01'
+bind = '0.0.0.0:8080'
+backlog = 2048
+accesslog = 'access.log'
+errorlog = 'error.log'
+user = 'ubuntu'
+group = 'ubuntu'

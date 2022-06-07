@@ -25,8 +25,20 @@ SECRET_KEY = 'kub6a3^57^jcq^mf^1uh#3y2of8*vv=fyzwp!joufy#agy*1#t'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["13.66.135.130", "127.0.0.1", "94.251.80.158", "localhost", "0.0.0.0"]
+ALLOWED_HOSTS = ["13.66.135.130", "127.0.0.1", "94.251.80.158", "localhost", "0.0.0.0", "ratingshistory.info"]
 
+CORS_ORIGIN_ALLOW_ALL = True
+
+CORS_REPLACE_HTTPS_REFERER = True
+
+CSRF_TRUSTED_ORIGINS = ['https://ratingshistory.info', 'http://ratingshistory.info']
+
+CSRF_COOKIE_DOMAIN = 'ratingshistory.info'
+
+CORS_ORIGIN_WHITELIST = (
+    'https://ratingshistory.info',
+    'ratingshistory.info',
+)
 
 # Application definition
 

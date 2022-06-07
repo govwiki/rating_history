@@ -1,4 +1,5 @@
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -15,12 +16,16 @@ import shutil
 import zipfile
 import glob
 import configparser
+import psutil
+from loguru import logger
 
 from webdriver_manager.chrome import ChromeDriverManager
 from imaplib import IMAP4_SSL
 import re
 from bs4 import BeautifulSoup
 
+
+logger.add('logs.log', level='DEBUG', format="{time} {level} {message}")
 
 class CSVExporter:
     column_names_map = OrderedDict((
@@ -243,10 +248,11 @@ class Downloader:
                  "download.prompt_for_download": False,
                  "download.directory_upgrade": True}
         chrome_options.add_argument('--no-sandbox')
-        #chrome_options.add_argument('--headless')
+        chrome_options.add_argument('--headless')
         chrome_options.add_argument('--disable-gpu')
         chrome_options.add_experimental_option('prefs', prefs)
-        self.browser = webdriver.Chrome(executable_path=ChromeDriverManager().install(), chrome_options=chrome_options)
+        # self.browser = webdriver.Chrome(executable_path=ChromeDriverManager().install(), chrome_options=chrome_options)
+        self.browser = webdriver.Chrome(executable_path='/home/sibers/Rating_history/rating_history/scraper/chromedriver', chrome_options=chrome_options)
         params = {'behavior': 'allow', 'downloadPath': self.downloads_path}
         self.browser.execute_cdp_cmd('Page.setDownloadBehavior', params)
 
@@ -419,9 +425,25 @@ class Downloader:
         time.sleep(1)
         downloads_after = glob.glob(self.downloads_path + '*.zip')
         print(f"{downloads_after=}")
-        new = ['/home/sibers/Rating_history/rating_history/tmp/downloads/SP-RMBS-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-CDO-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-Corporate-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-ABCP-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-Insurance-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-INT-Public-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-CMBS-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-US-Public-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-Financial-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-Other-SFP-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/AMBEST-CREDIT-RATINGS.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-CLO-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-Other-ABS-2022-05-01.zip', '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-Sovereign-2022-05-01.zip']
+        new = [
+            # '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-RMBS-2022-05-01.zip',
+            # '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-CDO-2022-05-01.zip',
+            # '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-Corporate-2022-05-01.zip',
+            # '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-ABCP-2022-05-01.zip',
+            # '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-Insurance-2022-05-01.zip',
+            # '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-INT-Public-2022-05-01.zip',
+            # '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-CMBS-2022-05-01.zip',
+            # '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-US-Public-2022-05-01.zip',
+            # '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-Financial-2022-05-01.zip',
+            # '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-Other-SFP-2022-05-01.zip',
+            # '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-CLO-2022-05-01.zip',
+            # '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-Other-ABS-2022-05-01.zip',
+            # '/home/sibers/Rating_history/rating_history/tmp/downloads/SP-Sovereign-2022-05-01.zip',
+            # '/home/sibers/Rating_history/rating_history/tmp/downloads/AMBEST-CREDIT-RATINGS.zip',
+            # '/home/sibers/Rating_history/rating_history/tmp/downloads/xbrl100-2022-05-15.zip',
+        ]
         for path in downloads_after:
-            if path not in downloads_before or path in new:# or path == '/home/badazhkov/Documents/Python/Rating_history/rating_history/tmp/downloads/AMBEST-CREDIT-RATINGS.zip' or path == '/home/sibers/Rating_history/rating_history/tmp/downloads/AMBEST-CREDIT-RATINGS.zip':
+            if path not in downloads_before or path in new:
                 paths.append(path)
 
         return paths
@@ -474,7 +496,7 @@ def parse_xml(file_path):
             row['RAN'] = ran
     return list_data
 
-def process_zip_file(file_path, source, exporter):
+def process_zip_file(file_path, source, exporter, xml_path):
     logging.debug('{} zip file downloaded to {}'.format(source, file_path))
     zip_file = zipfile.ZipFile(file_path)
     for file_name in zip_file.namelist():
@@ -485,7 +507,10 @@ def process_zip_file(file_path, source, exporter):
                 logging.debug('{} extraction failed - archive corrupted!')
                 continue
             logging.debug('{} extracted'.format(extracted_path))
+            ut = psutil.virtual_memory()
+            logging.debug(f"{ut} usage memory")
             list_content = parse_xml(extracted_path)
+            logging.debug('{} pars'.format(extracted_path))
             for row in list_content:
                 exporter.export(row)
             logging.debug('{} parsed'.format(extracted_path))
@@ -500,58 +525,64 @@ def clear_dir(dir):
         else:
             shutil.rmtree(path)
 
+@logger.catch
+def main():
+    try:
+        # time.sleep(1800)
+        config = configparser.ConfigParser()
+        config.read('conf.ini')
+
+        logging.basicConfig(
+            filename=config.get('general', 'log_file', fallback='rating_history_extracter.log'),
+            filemode='a', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s'
+        )
+
+        downloads_path = config.get('general', 'downloads_path', fallback='/tmp/downloads/')
+        if not os.path.exists(downloads_path):
+            os.mkdir(downloads_path)
+        elif not os.path.isdir(downloads_path):
+            print('ERROR: downloads_path parameter points to file!')
+            sys.exit(1)
+        xml_path = config.get('general', 'xml_path', fallback='/tmp/xml_path/')
+        if not os.path.exists(xml_path):
+            os.mkdir(xml_path)
+        elif not os.path.isdir(xml_path):
+            print('ERROR: xml_path parameter points to file!')
+            sys.exit(1)
+        csv_path = config.get('general', 'csv_path', fallback='/tmp/csv_path/')
+        if not os.path.exists(csv_path):
+            os.mkdir(csv_path)
+        elif not os.path.isdir(csv_path):
+            print('ERROR: csv_path parameter points to file!')
+            sys.exit(1)
+        wipe_old_files = config.getboolean('general', 'wipe_old_files', fallback=False)
+        if wipe_old_files:
+            for dir in (downloads_path, xml_path):
+                clear_dir(dir)
+
+        logging.debug('Started')
+        downloader = Downloader(config)
+        exporter = CSVExporter(csv_path)
+        # ['moodies', 'standardandpoors', 'fitchratings', 'kbra' 'dbrs', 'ambest', 'hrratings', 'jcr']
+        # ['moodies', 'standardandpoors', 'fitchratings', 'kbra' 'dbrs', 'hrratings', 'jcr']
+        for agency in ['standardandpoors']:
+            print(f"Begin {agency}!")
+            paths = downloader.download(agency)
+            if paths == False:
+                downloader = Downloader(config)
+            print(f"{paths=}")
+            if paths:
+                if wipe_old_files:
+                    pass
+                for path in paths:
+                    print(f"{path=}")
+                    process_zip_file(path, agency.capitalize, exporter, xml_path)
+        logging.debug('Rating history conversion finished!')
+        downloader.browser.quit()
+        exporter.close()
+        print("Finished!!")
+    except Exception as ex:
+        logging.debug(f"{ex} main error")
 
 if __name__ == '__main__':
-    #time.sleep(1800)
-    config = configparser.ConfigParser()
-    config.read('conf.ini')
-
-    logging.basicConfig(
-        filename=config.get('general', 'log_file', fallback='rating_history_extracter.log'),
-        filemode='a', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s'
-    )
-
-    downloads_path = config.get('general', 'downloads_path', fallback='/tmp/downloads/')
-    if not os.path.exists(downloads_path):
-        os.mkdir(downloads_path)
-    elif not os.path.isdir(downloads_path):
-        print('ERROR: downloads_path parameter points to file!')
-        sys.exit(1)
-    xml_path = config.get('general', 'xml_path', fallback='/tmp/xml_path/')
-    if not os.path.exists(xml_path):
-        os.mkdir(xml_path)
-    elif not os.path.isdir(xml_path):
-        print('ERROR: xml_path parameter points to file!')
-        sys.exit(1)
-    csv_path = config.get('general', 'csv_path', fallback='/tmp/csv_path/')
-    if not os.path.exists(csv_path):
-        os.mkdir(csv_path)
-    elif not os.path.isdir(csv_path):
-        print('ERROR: csv_path parameter points to file!')
-        sys.exit(1)
-    wipe_old_files = config.getboolean('general', 'wipe_old_files', fallback=False)
-    if wipe_old_files:
-        for dir in (downloads_path, xml_path):
-            clear_dir(dir)
-
-    logging.debug('Started')
-    downloader = Downloader(config)
-    exporter = CSVExporter(csv_path)
-    #['moodies', 'standardandpoors', 'fitchratings', 'kbra' 'dbrs', 'ambest', 'hrratings', 'jcr']
-    # ['moodies', 'standardandpoors', 'fitchratings', 'kbra' 'dbrs', 'hrratings', 'jcr']
-    for agency in ['moodies']:
-        print(f"Begin {agency}!")
-        paths = downloader.download(agency)
-        if paths == False:
-            downloader = Downloader(config)
-        print(f"{paths=}")
-        if paths:
-            if wipe_old_files:
-                pass
-            for path in paths:
-                print(f"{path=}")
-                process_zip_file(path, agency.capitalize, exporter)
-    logging.debug('Rating history conversion finished!')
-    downloader.browser.quit()
-    exporter.close()
-    print("Finished!!")
+    main()
