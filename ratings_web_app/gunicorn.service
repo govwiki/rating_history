@@ -1,0 +1,19 @@
+[Unit]
+Description=gunicorn daemon
+Requires=gunicorn.socket
+After=network.target
+
+[Service]
+User=sibers
+
+WorkingDirectory=/home/sibers/Rating_history/rating_history/ratings_web_app/
+Environment="PATH=/home/sibers/Rating_history/venv/bin"
+ExecStart=/home/sibers/Rating_history/venv/bin/gunicorn \
+    --access-logfile - \
+    --workers 3 \
+    --bind unix:/run/gunicorn.sock \
+    ratings_web_app.wsgi:application
+
+
+[Install]
+WantedBy=multi-user.target
