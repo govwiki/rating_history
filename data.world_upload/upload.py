@@ -1,6 +1,7 @@
 import csv
 import os
 import time
+import psutil
 
 import requests
 
@@ -49,17 +50,28 @@ if __name__ == '__main__':
     with open('../tmp/ratings_for_upload.csv', 'w') as out_file:
         writer = csv.writer(out_file)
         writer.writerow(HEADER)  #!!!
+        print(f"Begin first loop")
         for file_name in os.listdir('../var/csv_path/'):
             with open(os.path.join('../var/csv_path/', file_name), 'r') as in_file:
+                print(f"{file_name=}")
                 reader = csv.reader(in_file)
                 #reader.next()
                 for row in reader:
                     writer.writerow(row) #!!!
             out_file.flush()
+    print(f"Begin second loop")
 
     with open('../tmp/ratings_for_upload.csv', 'rb') as uploaded_file:
         headers = {'Authorization': f"Bearer {AUTH_KEY}"}
+        print(f"{headers=}")
+        ut = psutil.virtual_memory()
+        print(f"{ut} usage memory")
         files = {'file': uploaded_file}
+        print(f"{files=}")
+        ut = psutil.virtual_memory()
+        print(f"{ut} usage memory")
+        print(uploaded_file.readlines())
+
         r = requests.post(
             f"https://api.data.world/v0/datasets/{USERNAME}/api-sandbox/files",
             files=files, headers=headers,

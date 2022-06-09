@@ -65,9 +65,35 @@
       </h3>
       <ul>
         {% for file in files %}
-          <li>
-            <a href="/csv/{{ file }}">{{ file }}  <span>({{ file.lines_count }} lines)</span></a>
-          </li>
+          {% if "Standard" == file.agency|make_list|slice:"2:10"|join:"" %}
+            <li>
+              <a href="/csv/{{ file }}">{{ file }}  <span>({{ file.lines_count }} lines)</span></a>
+            </li>
+          {% endif %}
+        {% endfor %}
+
+        {% for file in files %}
+          {% if "Moody" == file.agency|make_list|slice:"2:7"|join:"" %}
+            <li>
+              <a href="/csv/{{ file }}">{{ file }}  <span>({{ file.lines_count }} lines)</span></a>
+            </li>
+          {% endif %}
+        {% endfor %}
+
+        {% for file in files %}
+          {% if "Fitch" == file.agency|make_list|slice:"2:7"|join:"" %}
+            <li>
+              <a href="/csv/{{ file }}">{{ file }}  <span>({{ file.lines_count }} lines)</span></a>
+            </li>
+          {% endif %}
+        {% endfor %}
+
+        {% for file in files %}
+          {% if "Standard" != file.agency|make_list|slice:"2:10"|join:"" and "Moody" != file.agency|make_list|slice:"2:7"|join:"" and "Fitch" != file.agency|make_list|slice:"2:7"|join:"" %}
+            <li>
+              <a href="/csv/{{ file }}">{{ file }}  <span>({{ file.lines_count }} lines)</span></a>
+            </li>
+          {% endif %}
         {% endfor %}
       </ul>
     <p>

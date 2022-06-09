@@ -6,8 +6,8 @@ class Agency(models.Model):
     name = models.CharField(max_length=256, default='', unique=True)
     position = models.IntegerField(default=1)
 
-    class Meta:
-        ordering = ['position']
+    # class Meta:
+    #     ordering = ['position']
 
     def __str__(self):
         return '{} {}'.format(self.position, self.name)
@@ -19,7 +19,7 @@ class File(models.Model):
     lines_count = models.IntegerField(default=1)
 
     class Meta:
-        ordering = ['agency__position', 'path']
+        ordering = ['path']
 
     def __str__(self):
         return os.path.basename(self.path)
